@@ -2,7 +2,7 @@
 
 > Turn plain-English requirements into verified, production-grade database systems. Powered by Gemini 3.
 
-**[Live Demo](https://episteme-one.vercel.app)** | [Architecture](./ARCHITECTURE.md) | [Gemini Prompts](./GEMINI_PROMPTS.md) | [Demo Script](./DEMO_SCRIPT.md)
+**[Live Demo](https://episteme-one.vercel.app)** | [Architecture](./ARCHITECTURE.md) | [Gemini Prompts](./GEMINI_PROMPTS.md) | 
 
 ---
 
