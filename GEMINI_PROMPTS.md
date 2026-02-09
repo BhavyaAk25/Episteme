@@ -147,7 +147,7 @@ const AutoFixSchema = z.object({
 });
 ```
 
-## Prompt Engineering Tips for Gemini 3
+## Prompt Tips for Gemini 3 FLASH
 
 1. **Be concise** — Gemini 3 responds best to direct, clear instructions. Don't over-engineer prompts.
 2. **JSON only** — Always specify `response_mime_type: "application/json"` and provide the schema
