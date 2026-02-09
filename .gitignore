@@ -44,6 +44,9 @@ next-env.d.ts
 CLAUDE.md
 NEXTAGENT.md
 EPISTEME_SKILL.md
+DEMO_SCRIPT.md
+SETUP_GUIDE.md
+/docs/
 
 # Generated assets
 /output/
