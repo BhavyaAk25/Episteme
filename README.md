@@ -217,16 +217,6 @@ episteme/
 
 ---
 
-## Hackathon
-
-Built for the [Gemini 3 Devpost Hackathon](https://gemini3.devpost.com).
-
-**Evaluation Criteria:**
-- **Technical Execution (40%)** — Multi-step Gemini orchestration, structured outputs, verified pipeline
-- **Innovation / Wow Factor (30%)** — Live build animation, self-healing schema loop, Palantir-grade ontology
-- **Potential Impact (20%)** — Prevents data corruption from poorly designed schemas
-- **Presentation / Demo (10%)** — 3-minute demo, architecture docs, clean codebase
-
 ---
 
 ## License
