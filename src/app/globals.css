@@ -1,0 +1,233 @@
+@import "tailwindcss";
+
+:root {
+  /* Episteme Light Beige Theme */
+  --bg-canvas: #f6efe5;
+  --bg-surface: #fff8ef;
+  --bg-node: #fffdf8;
+  --bg-node-header: #f6ebde;
+  --text-primary: #32271b;
+  --text-secondary: #7b6a56;
+  --accent-blue: #2f6eb8;
+  --accent-green: #237d54;
+  --accent-amber: #b8811a;
+  --accent-red: #b14f42;
+  --accent-purple: #7d59a5;
+  --border: #ddcdb6;
+  --border-hover: #c9b496;
+
+  /* UI scale tokens */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --text-title: 1rem;
+  --text-body: 0.875rem;
+  --text-meta: 0.75rem;
+  --surface-shadow: 0 10px 24px rgba(86, 61, 38, 0.12);
+  --surface-shadow-soft: 0 6px 16px rgba(86, 61, 38, 0.08);
+
+  /* Semantic mappings */
+  --background: var(--bg-canvas);
+  --foreground: var(--text-primary);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-canvas: var(--bg-canvas);
+  --color-surface: var(--bg-surface);
+  --color-node: var(--bg-node);
+  --color-node-header: var(--bg-node-header);
+  --color-muted: var(--text-secondary);
+  --color-accent: var(--accent-blue);
+  --color-success: var(--accent-green);
+  --color-warning: var(--accent-amber);
+  --color-error: var(--accent-red);
+  --color-purple: var(--accent-purple);
+  --color-border: var(--border);
+  --font-sans: var(--font-ibm-plex-sans);
+  --font-display: var(--font-sora);
+  --font-mono: var(--font-jetbrains-mono);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background:
+    radial-gradient(circle at 10% -10%, #fff4df 0%, #f6efe5 40%, #f4ebdf 100%);
+  color: #3D3425;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Custom scrollbar for light theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
+}
+
+/* React Flow customizations */
+.react-flow__background {
+  background-color: var(--bg-canvas) !important;
+}
+
+.react-flow__minimap {
+  background-color: rgba(255, 252, 247, 0.9) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+}
+
+.react-flow__controls {
+  background-color: var(--bg-surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+}
+
+.react-flow__controls-button {
+  background-color: var(--bg-surface) !important;
+  border-color: var(--border) !important;
+  fill: var(--text-secondary) !important;
+}
+
+.react-flow__controls-button:hover {
+  background-color: var(--bg-node) !important;
+}
+
+/* Selection ring */
+.react-flow__node.selected {
+  box-shadow: 0 0 0 2px var(--accent-blue);
+}
+
+/* Let custom edge components control their own stroke colors */
+
+.ui-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  box-shadow: var(--surface-shadow-soft);
+}
+
+.ui-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 30px;
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  font-size: var(--text-meta);
+  font-weight: 600;
+}
+
+.ui-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 24px;
+  padding-inline: 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 0.675rem;
+  font-weight: 600;
+}
+
+.ui-section-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8B7355;
+  font-weight: 600;
+}
+
+.ui-ghost-btn {
+  border: 1px solid rgba(0,0,0,0.15);
+  border-radius: 8px;
+  background: white;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  min-height: 36px;
+  padding: 8px 20px;
+}
+
+.ui-ghost-btn:hover {
+  background: var(--bg-node);
+}
+
+.ui-primary-btn {
+  border: none;
+  border-radius: 8px;
+  background: #B8976A;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  min-height: 36px;
+  padding: 8px 20px;
+}
+
+.ui-primary-btn:hover {
+  filter: brightness(0.93);
+}
+
+.react-flow__attribution {
+  display: none !important;
+}
+
+/* Dotted grid for empty canvas state */
+.dotted-grid-bg {
+  background-image: radial-gradient(circle, rgba(0,0,0,0.06) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Edge animation for drawing */
+@keyframes dash {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.edge-animated {
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: dash 0.5s ease-out forwards;
+}
+
+/* Hide Next.js dev indicator bubble in local demos */
+[data-nextjs-dev-tools-button],
+[data-nextjs-dev-tools],
+nextjs-portal,
+#__next-build-watcher,
+[data-next-badge-root],
+[data-nextjs-toast] {
+  display: none !important;
+}
