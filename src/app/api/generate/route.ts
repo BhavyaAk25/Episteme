@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { callGemini, getGeminiErrorInfo } from "@/lib/gemini/client";
+import { callGemini, getGeminiConfigStatus, getGeminiErrorInfo } from "@/lib/gemini/client";
 import { createFallbackGeneration } from "@/lib/gemini/fallbackGeneration";
 import { GENERATION_PROMPT } from "@/lib/gemini/prompts";
 import { GenerationResponseSchema } from "@/lib/gemini/schemas";
@@ -7,6 +7,9 @@ import type { GenerationResponse as GeminiGenerationResponse } from "@/lib/gemin
 import type { Ontology } from "@/types/ontology";
 import type { ERD } from "@/types/erd";
 import type { Plan, BuildScript, BuildStep } from "@/types/gemini";
+
+type TemplateId = "inventory" | "ecommerce" | "saas";
+type FallbackReason = "quota" | "parse_error" | "validation_error" | "provider_error" | "config_error";
 
 function sanitizeERD(erd: ERD): ERD {
   const tableNames = new Set(erd.tables.map(t => t.name));
@@ -208,16 +211,84 @@ function sanitizeErrorMessage(message: string): string {
   return trimmed;
 }
 
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    const { prompt, templateId } = body;
+function buildFallbackResponse(args: {
+  prompt: string;
+  templateId?: TemplateId;
+  reason: FallbackReason;
+  geminiAttempted: boolean;
+  warning: string;
+  quotaState: "ok" | "cooldown" | "quota_exhausted";
+  providerErrorCode: string | null;
+  retryAfterSec: number | null;
+}) {
+  const fallback = createFallbackGeneration(args.prompt, {
+    templateId: args.templateId,
+    geminiAttempted: args.geminiAttempted,
+    fallbackReason: args.reason,
+  });
+  const cleanFallbackErd = sanitizeERD(fallback.erd);
+  const reconciledFallbackOntology = reconcileOntologyWithErd(fallback.ontology, cleanFallbackErd);
 
-    if (!prompt || typeof prompt !== "string") {
+  return NextResponse.json({
+    ...fallback,
+    ontology: reconciledFallbackOntology,
+    erd: cleanFallbackErd,
+    warning: args.warning,
+    source: "fallback",
+    generationMode: "fallback",
+    quotaState: args.quotaState,
+    providerErrorCode: args.providerErrorCode,
+    retryAfterSec: args.retryAfterSec,
+  });
+}
+
+export async function POST(request: Request) {
+  let prompt = "";
+  let templateId: TemplateId | undefined;
+
+  try {
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid JSON body" },
+        { status: 400 }
+      );
+    }
+
+    const rawPrompt = typeof body === "object" && body !== null
+      ? (body as { prompt?: unknown }).prompt
+      : undefined;
+    const rawTemplateId = typeof body === "object" && body !== null
+      ? (body as { templateId?: unknown }).templateId
+      : undefined;
+
+    if (rawTemplateId === "inventory" || rawTemplateId === "ecommerce" || rawTemplateId === "saas") {
+      templateId = rawTemplateId;
+    }
+
+    prompt = typeof rawPrompt === "string" ? rawPrompt.trim() : "";
+
+    if (!prompt) {
       return NextResponse.json(
         { error: "Prompt is required" },
         { status: 400 }
       );
+    }
+
+    const configStatus = getGeminiConfigStatus();
+    if (!configStatus.ready) {
+      return buildFallbackResponse({
+        prompt,
+        templateId,
+        reason: "config_error",
+        geminiAttempted: false,
+        warning: "Gemini is not configured in the deployment. Showing local fallback schema so the flow stays usable.",
+        quotaState: "ok",
+        providerErrorCode: configStatus.reasonCode,
+        retryAfterSec: null,
+      });
     }
 
     let rawResponse: string;
@@ -225,35 +296,23 @@ export async function POST(request: Request) {
       rawResponse = await callGemini(GENERATION_PROMPT(prompt), { operation: "generate" });
     } catch (error) {
       const info = getGeminiErrorInfo(error);
-      const message = info.message;
-
-      if (info.isQuotaOrRateLimited || info.isCooldown) {
-        const fallback = createFallbackGeneration(prompt, {
-          templateId,
-          geminiAttempted: true,
-          fallbackReason: "quota",
-        });
-        const cleanFallbackErd = sanitizeERD(fallback.erd);
-        const reconciledFallbackOntology = reconcileOntologyWithErd(fallback.ontology, cleanFallbackErd);
-        return NextResponse.json({
-          ...fallback,
-          ontology: reconciledFallbackOntology,
-          erd: cleanFallbackErd,
-          warning: info.isCooldown
-            ? "Gemini is on cooldown after rate limiting. Showing local fallback schema so the flow remains demoable."
-            : "Gemini quota is exhausted. Showing local fallback schema so the flow remains demoable.",
-          source: "fallback",
-          generationMode: "fallback",
-          quotaState: info.isCooldown ? "cooldown" : "quota_exhausted",
-          providerErrorCode: info.providerCode,
-          retryAfterSec: info.retryAfterMs ? Math.ceil(info.retryAfterMs / 1000) : null,
-        });
-      }
-
-      return NextResponse.json(
-        { error: sanitizeErrorMessage(message) },
-        { status: 500 }
-      );
+      const isQuotaPath = info.isQuotaOrRateLimited || info.isCooldown;
+      return buildFallbackResponse({
+        prompt,
+        templateId,
+        reason: isQuotaPath ? "quota" : "provider_error",
+        geminiAttempted: true,
+        warning: isQuotaPath
+          ? (
+            info.isCooldown
+              ? "Gemini is on cooldown after rate limiting. Showing local fallback schema so the flow remains demoable."
+              : "Gemini quota is exhausted. Showing local fallback schema so the flow remains demoable."
+          )
+          : "Gemini request failed. Showing local fallback schema so the flow stays usable.",
+        quotaState: info.isCooldown ? "cooldown" : (info.isQuotaOrRateLimited ? "quota_exhausted" : "ok"),
+        providerErrorCode: info.providerCode,
+        retryAfterSec: info.retryAfterMs ? Math.ceil(info.retryAfterMs / 1000) : null,
+      });
     }
 
     // Parse the JSON response
@@ -262,10 +321,16 @@ export async function POST(request: Request) {
       parsedResponse = JSON.parse(rawResponse);
     } catch {
       console.error("Failed to parse Gemini response:", rawResponse);
-      return NextResponse.json(
-        { error: "Invalid response from AI model" },
-        { status: 500 }
-      );
+      return buildFallbackResponse({
+        prompt,
+        templateId,
+        reason: "parse_error",
+        geminiAttempted: true,
+        warning: "Gemini returned malformed JSON. Showing local fallback schema so the flow stays usable.",
+        quotaState: "ok",
+        providerErrorCode: "INVALID_JSON_RESPONSE",
+        retryAfterSec: null,
+      });
     }
 
     // Validate with Zod
@@ -273,19 +338,31 @@ export async function POST(request: Request) {
 
     if (!validationResult.success) {
       console.error("Validation errors:", validationResult.error.issues);
-      // Try to return partial data even if validation fails
-      // This allows us to be more lenient with the AI output
+      return buildFallbackResponse({
+        prompt,
+        templateId,
+        reason: "validation_error",
+        geminiAttempted: true,
+        warning: "Gemini returned an unexpected schema shape. Showing local fallback schema so the flow stays usable.",
+        quotaState: "ok",
+        providerErrorCode: "SCHEMA_VALIDATION_FAILED",
+        retryAfterSec: null,
+      });
     }
 
-    const data = (validationResult.success
-      ? validationResult.data
-      : parsedResponse) as Partial<GeminiGenerationResponse>;
+    const data = validationResult.data as GeminiGenerationResponse;
 
     if (!data?.plan || !data?.ontology || !data?.erd) {
-      return NextResponse.json(
-        { error: "AI response missed required sections (plan/ontology/erd)." },
-        { status: 500 }
-      );
+      return buildFallbackResponse({
+        prompt,
+        templateId,
+        reason: "validation_error",
+        geminiAttempted: true,
+        warning: "Gemini omitted required sections. Showing local fallback schema so the flow stays usable.",
+        quotaState: "ok",
+        providerErrorCode: "MISSING_REQUIRED_SECTIONS",
+        retryAfterSec: null,
+      });
     }
 
     const typedData = data as GeminiGenerationResponse;
@@ -502,13 +579,23 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Generation error:", error);
-    return NextResponse.json(
-      {
-        error: sanitizeErrorMessage(
-          error instanceof Error ? error.message : "Generation failed"
-        ),
-      },
-      { status: 500 }
-    );
+    if (prompt) {
+      return buildFallbackResponse({
+        prompt,
+        templateId,
+        reason: "provider_error",
+        geminiAttempted: true,
+        warning: "Unexpected generation error. Showing local fallback schema so the flow stays usable.",
+        quotaState: "ok",
+        providerErrorCode: "UNEXPECTED_ROUTE_ERROR",
+        retryAfterSec: null,
+      });
+    }
+
+    return NextResponse.json({
+      error: sanitizeErrorMessage(
+        error instanceof Error ? error.message : "Generation failed"
+      ),
+    }, { status: 500 });
   }
 }

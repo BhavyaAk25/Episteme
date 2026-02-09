@@ -24,7 +24,7 @@ interface ProjectState {
   fallbackDomain: "inventory" | "saas" | "ecommerce" | "generic" | null;
   generationWarning: string | null;
   geminiAttempted: boolean;
-  fallbackReason: "quota" | "parse_error" | "validation_error" | null;
+  fallbackReason: "quota" | "parse_error" | "validation_error" | "provider_error" | "config_error" | null;
   domainDecisionSource: "template_hint" | "classifier" | "gemini" | null;
 
   // Build animation
@@ -65,7 +65,7 @@ const initialState = {
   fallbackDomain: null,
   generationWarning: null,
   geminiAttempted: false,
-  fallbackReason: null as "quota" | "parse_error" | "validation_error" | null,
+  fallbackReason: null as "quota" | "parse_error" | "validation_error" | "provider_error" | "config_error" | null,
   domainDecisionSource: null as "template_hint" | "classifier" | "gemini" | null,
   currentBuildStep: 0,
   isPlaying: false,

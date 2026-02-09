@@ -150,9 +150,11 @@ Create a `.env.local` file in the project root:
 
 ```
 GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-3-flash-preview
 ```
 
-Get a free Gemini API key at [Google AI Studio](https://aistudio.google.com/apikey). The free tier provides access to `gemini-3-flash-preview` (30 requests/min, 1M tokens/min).
+Get a free Gemini API key at [Google AI Studio](https://aistudio.google.com/apikey).  
+`GEMINI_MODEL` is optional but recommended in production so deployments stay explicit and reproducible.
 
 ### Run
 
@@ -169,10 +171,19 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 This is a standard Next.js project. Deploy to Vercel:
 
 1. Import the GitHub repo at [vercel.com/new](https://vercel.com/new)
-2. Set `GEMINI_API_KEY` in Environment Variables
+2. Set Environment Variables:
+   - `GEMINI_API_KEY` (required)
+   - `GEMINI_MODEL` (recommended, e.g. `gemini-3-flash-preview`)
 3. Deploy — Vercel auto-detects Next.js
 
 The `sql-wasm.js` and `sql-wasm.wasm` files in `public/` are served as static assets automatically.
+
+### Generate endpoint readiness checklist
+
+- `GEMINI_API_KEY` exists in Vercel Project Settings -> Environment Variables.
+- `GEMINI_MODEL` is set to a valid model name for your Google project.
+- Redeploy after changing environment variables.
+- If Gemini is unavailable, `/api/generate` now returns a local fallback schema with warning metadata instead of failing hard.
 
 ---
 

@@ -4,11 +4,12 @@ import type { Ontology, Confidence } from "@/types/ontology";
 
 export type FallbackDomain = "inventory" | "saas" | "ecommerce" | "generic";
 export type DomainDecisionSource = "template_hint" | "classifier" | "gemini";
+export type FallbackReason = "quota" | "parse_error" | "validation_error" | "provider_error" | "config_error";
 
 interface FallbackGenerationPayload extends GenerationResponse {
   fallbackDomain: FallbackDomain;
   geminiAttempted: boolean;
-  fallbackReason: "quota" | "parse_error" | "validation_error" | null;
+  fallbackReason: FallbackReason | null;
   domainDecisionSource: DomainDecisionSource;
 }
 
@@ -862,7 +863,7 @@ function buildGenericFallback(prompt: string): FallbackGenerationPayload {
 export interface FallbackOptions {
   templateId?: "inventory" | "ecommerce" | "saas";
   geminiAttempted?: boolean;
-  fallbackReason?: "quota" | "parse_error" | "validation_error";
+  fallbackReason?: FallbackReason;
 }
 
 export function createFallbackGeneration(prompt: string, options?: FallbackOptions): FallbackGenerationPayload {

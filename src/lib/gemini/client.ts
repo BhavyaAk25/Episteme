@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
 // Initialize the Gemini client
-const apiKey = process.env.GEMINI_API_KEY;
+const apiKey = process.env.GEMINI_API_KEY?.trim() ?? "";
 
 if (!apiKey) {
   console.warn("GEMINI_API_KEY is not set. Gemini features will not work.");
@@ -9,8 +9,74 @@ if (!apiKey) {
 
 export const genai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
-// Model selection
-export const MODEL_NAME = process.env.GEMINI_MODEL ?? "gemini-3-flash-preview";
+const DEFAULT_MODEL_CANDIDATES = [
+  "gemini-3-flash-preview",
+  "gemini-3-flash",
+];
+
+function uniqueNonEmpty(values: Array<string | undefined | null>): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    if (!value) continue;
+    const normalized = value.trim();
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    result.push(normalized);
+  }
+  return result;
+}
+
+function parseModelCandidates(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+const modelCandidates = uniqueNonEmpty([
+  ...parseModelCandidates(process.env.GEMINI_MODEL),
+  ...parseModelCandidates(process.env.GOOGLE_MODEL),
+  ...DEFAULT_MODEL_CANDIDATES,
+]);
+
+// Primary model used for logging and status display.
+export const MODEL_NAME = modelCandidates[0] ?? DEFAULT_MODEL_CANDIDATES[0];
+
+export interface GeminiConfigStatus {
+  ready: boolean;
+  reasonCode: "MISSING_API_KEY" | "MISSING_MODEL" | null;
+  message: string;
+  modelCandidates: string[];
+}
+
+export function getGeminiConfigStatus(): GeminiConfigStatus {
+  if (!apiKey) {
+    return {
+      ready: false,
+      reasonCode: "MISSING_API_KEY",
+      message: "GEMINI_API_KEY is not configured",
+      modelCandidates,
+    };
+  }
+
+  if (modelCandidates.length === 0) {
+    return {
+      ready: false,
+      reasonCode: "MISSING_MODEL",
+      message: "No Gemini model is configured",
+      modelCandidates,
+    };
+  }
+
+  return {
+    ready: true,
+    reasonCode: null,
+    message: "Gemini configuration is valid",
+    modelCandidates,
+  };
+}
 
 function envInt(name: string, fallback: number, min: number, max: number): number {
   const raw = process.env[name];
@@ -77,11 +143,34 @@ function parseRetryAfterMs(message: string): number | null {
 function parseProviderCode(message: string): string | null {
   const upper = message.toUpperCase();
   if (upper.includes("MAX_TOKENS")) return "MAX_TOKENS";
+  if (upper.includes("MISSING_API_KEY") || upper.includes("API KEY NOT CONFIGURED")) return "MISSING_API_KEY";
+  if (upper.includes("INVALID_API_KEY") || upper.includes("API_KEY_INVALID")) return "INVALID_API_KEY";
+  if (upper.includes("UNAUTHENTICATED")) return "UNAUTHENTICATED";
+  if (upper.includes("PERMISSION_DENIED")) return "PERMISSION_DENIED";
+  if (upper.includes("MODEL_NOT_FOUND")) return "MODEL_NOT_FOUND";
+  if (upper.includes("INVALID_ARGUMENT")) return "INVALID_ARGUMENT";
+  if (upper.includes("NOT_FOUND")) return "NOT_FOUND";
+  if (upper.includes("UNIMPLEMENTED")) return "UNIMPLEMENTED";
   if (upper.includes("RESOURCE_EXHAUSTED")) return "RESOURCE_EXHAUSTED";
   if (upper.includes("RATE_LIMIT_EXCEEDED")) return "RATE_LIMIT_EXCEEDED";
   if (upper.includes("TOO_MANY_REQUESTS")) return "TOO_MANY_REQUESTS";
   if (message.includes("429")) return "HTTP_429";
   return null;
+}
+
+function isModelSelectionError(message: string): boolean {
+  const lower = message.toLowerCase();
+  const mentionsModel = lower.includes("model");
+  return (
+    mentionsModel &&
+    (
+      lower.includes("not found") ||
+      lower.includes("unsupported") ||
+      lower.includes("unknown") ||
+      lower.includes("invalid argument") ||
+      lower.includes("is not a valid model")
+    )
+  );
 }
 
 export function getGeminiErrorInfo(error: unknown): GeminiErrorInfo {
@@ -147,8 +236,33 @@ export async function callGemini(
     useCache?: boolean;
   } = {}
 ): Promise<string> {
-  if (!genai) {
-    throw new Error("Gemini API key not configured");
+  const configStatus = getGeminiConfigStatus();
+  if (!configStatus.ready) {
+    throw new GeminiApiError(
+      configStatus.message,
+      {
+        isQuotaOrRateLimited: false,
+        isCooldown: false,
+        isTruncated: false,
+        providerCode: configStatus.reasonCode,
+        retryAfterMs: null,
+        message: configStatus.message,
+      }
+    );
+  }
+  const geminiClient = genai;
+  if (!geminiClient) {
+    throw new GeminiApiError(
+      "Gemini client is not initialized",
+      {
+        isQuotaOrRateLimited: false,
+        isCooldown: false,
+        isTruncated: false,
+        providerCode: "MISSING_API_KEY",
+        retryAfterMs: null,
+        message: "Gemini client is not initialized",
+      }
+    );
   }
 
   const {
@@ -191,10 +305,12 @@ export async function callGemini(
   }
 
   let lastError: Error | null = null;
+  let modelIndex = 0;
 
   const totalAttempts = Math.max(1, maxRetries + 1);
   for (let attempt = 0; attempt < totalAttempts; attempt++) {
     try {
+      const modelName = modelCandidates[Math.min(modelIndex, modelCandidates.length - 1)] ?? MODEL_NAME;
       const config: {
         temperature: number;
         topK: number;
@@ -218,8 +334,8 @@ export async function callGemini(
         config.responseJsonSchema = responseJsonSchema;
       }
 
-      const response = await genai.models.generateContent({
-        model: MODEL_NAME,
+      const response = await geminiClient.models.generateContent({
+        model: modelName,
         contents: prompt,
         config,
       });
@@ -259,6 +375,14 @@ export async function callGemini(
       }
 
       lastError = error instanceof Error ? error : new Error(String(error));
+      if (isModelSelectionError(lastError.message) && modelIndex < modelCandidates.length - 1) {
+        const previousModel = modelCandidates[modelIndex];
+        modelIndex += 1;
+        const nextModel = modelCandidates[modelIndex];
+        console.warn(`Gemini model "${previousModel}" failed; retrying with "${nextModel}".`);
+        attempt -= 1;
+        continue;
+      }
 
       if (isQuotaOrRateLimitError(lastError.message)) {
         const retryAfterMs = parseRetryAfterMs(lastError.message);

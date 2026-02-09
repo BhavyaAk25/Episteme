@@ -70,7 +70,7 @@ export interface GenerationResponse {
   fallbackDomain?: "inventory" | "saas" | "ecommerce" | "generic";
   warning?: string;
   geminiAttempted?: boolean;
-  fallbackReason?: "quota" | "parse_error" | "validation_error" | null;
+  fallbackReason?: "quota" | "parse_error" | "validation_error" | "provider_error" | "config_error" | null;
   domainDecisionSource?: "template_hint" | "classifier" | "gemini";
   quotaState?: "ok" | "cooldown" | "quota_exhausted";
   providerErrorCode?: string | null;
