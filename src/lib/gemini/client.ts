@@ -95,7 +95,30 @@ const DEFAULT_COOLDOWN_MS = envInt("GEMINI_QUOTA_COOLDOWN_MS", 15000, 5000, 3000
 
 let quotaCooldownUntilMs = 0;
 
+// Bounded LRU cache so a long-running server never leaks memory by holding
+// every prompt it has ever seen. Re-inserting on read keeps hot entries fresh.
+const RESPONSE_CACHE_MAX_ENTRIES = envInt("GEMINI_RESPONSE_CACHE_SIZE", 50, 0, 500);
 const responseCache = new Map<string, string>();
+
+function readCache(key: string): string | undefined {
+  const cached = responseCache.get(key);
+  if (cached === undefined) return undefined;
+  // Refresh recency: delete + re-set moves the key to the end of the Map.
+  responseCache.delete(key);
+  responseCache.set(key, cached);
+  return cached;
+}
+
+function writeCache(key: string, value: string): void {
+  if (RESPONSE_CACHE_MAX_ENTRIES === 0) return;
+  responseCache.delete(key);
+  responseCache.set(key, value);
+  while (responseCache.size > RESPONSE_CACHE_MAX_ENTRIES) {
+    const oldestKey = responseCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    responseCache.delete(oldestKey);
+  }
+}
 
 export interface GeminiErrorInfo {
   isQuotaOrRateLimited: boolean;
@@ -283,7 +306,7 @@ export async function callGemini(
   );
 
   if (useCache) {
-    const cached = responseCache.get(prompt);
+    const cached = readCache(prompt);
     if (cached) {
       return cached;
     }
@@ -366,7 +389,7 @@ export async function callGemini(
       }
 
       if (useCache) {
-        responseCache.set(prompt, text);
+        writeCache(prompt, text);
       }
       return text;
     } catch (error) {

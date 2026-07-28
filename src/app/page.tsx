@@ -11,11 +11,30 @@ import { BottomDrawer } from "@/components/simulation/BottomDrawer";
 import { ExportModal } from "@/components/export/ExportModal";
 import { useUIStore } from "@/store/useUIStore";
 import { useProjectStore } from "@/store/useProjectStore";
+import { useCanvasStore } from "@/store/useCanvasStore";
+import { erdToNodes, erdToEdges } from "@/lib/ontology/transformer";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function Home() {
   const { sidebarOpen } = useUIStore();
   const { error, errorTitle, setError } = useProjectStore();
+
+  // Restore the last session from localStorage on mount, then rebuild the
+  // canvas from the persisted ERD so a page refresh doesn't lose work.
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.resolve(useProjectStore.persist.rehydrate()).then(() => {
+      if (cancelled) return;
+      const { erd, ontology } = useProjectStore.getState();
+      if (erd && ontology) {
+        useCanvasStore.getState().setNodes(erdToNodes(erd, ontology));
+        useCanvasStore.getState().setEdges(erdToEdges(erd));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

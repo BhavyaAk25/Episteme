@@ -173,7 +173,14 @@ export async function POST(request: Request) {
     const zip = new JSZip();
 
     if (includeSql) {
-      zip.file("schema.sql", `${schemaSql.trim()}\n`);
+      const schemaHeader = [
+        "-- Episteme — generated database schema (PostgreSQL dialect).",
+        "-- Verified in-browser against an equivalent SQLite sandbox (sql.js);",
+        "-- see verification_report.html for the chaos-test results.",
+        "",
+        "",
+      ].join("\n");
+      zip.file("schema.sql", `${schemaHeader}${schemaSql.trim()}\n`);
     }
 
     if (includeOntology) {

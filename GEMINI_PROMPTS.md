@@ -153,5 +153,5 @@ const AutoFixSchema = z.object({
 2. **JSON only** — Always specify `response_mime_type: "application/json"` and provide the schema
 3. **Few-shot helps** — Include one complete example in the prompt for complex schemas
 4. **Temperature** — Keep at 1.0 (default). Lowering below 1.0 may hurt reasoning quality on Gemini 3.
-5. **Thinking level** — Use HIGH for generation phases, LOW for validation/fix phases (saves tokens)
+5. **JSON mode over thinking config** — an explicit `thinkingConfig` conflicts with `responseMimeType: "application/json"` and can produce non-JSON output, so Episteme relies on JSON mode + Zod validation instead.
 6. **Don't chain thoughts** — Gemini 3 does internal reasoning. Don't add "think step by step."

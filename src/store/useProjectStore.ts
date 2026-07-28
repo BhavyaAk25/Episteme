@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type { BuildPhase, BuildScript, Plan, GenerationResponse } from "@/types/gemini";
 import type { Ontology } from "@/types/ontology";
 import type { ERD } from "@/types/erd";
@@ -71,7 +72,9 @@ const initialState = {
   isPlaying: false,
 };
 
-export const useProjectStore = create<ProjectState>((set, get) => ({
+export const useProjectStore = create<ProjectState>()(
+  persist(
+    (set, get) => ({
   ...initialState,
 
   setPrompt: (prompt, templateId) => set({ prompt, templateId: templateId ?? null }),
@@ -135,4 +138,29 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   reset: () => set(initialState),
-}));
+    }),
+    {
+      name: "episteme-project",
+      storage: createJSONStorage(() => localStorage),
+      // Manually rehydrated on the client (see page.tsx) so server and client
+      // render the same empty state first and never mismatch.
+      skipHydration: true,
+      // Persist generated artifacts only — never transient/loading flags.
+      partialize: (state) => ({
+        prompt: state.prompt,
+        templateId: state.templateId,
+        plan: state.plan,
+        ontology: state.ontology,
+        erd: state.erd,
+        buildScript: state.buildScript,
+        schemaSql: state.schemaSql,
+        generationMode: state.generationMode,
+        fallbackDomain: state.fallbackDomain,
+        generationWarning: state.generationWarning,
+        geminiAttempted: state.geminiAttempted,
+        fallbackReason: state.fallbackReason,
+        domainDecisionSource: state.domainDecisionSource,
+      }),
+    }
+  )
+);

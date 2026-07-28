@@ -2,13 +2,13 @@
 
 > Turn plain-English requirements into verified, production-grade database systems. Powered by Gemini 3.
 
-**[Live Demo](https://episteme-one.vercel.app)** | [Architecture](./ARCHITECTURE.md) | [Gemini Prompts](./GEMINI_PROMPTS.md) | 
+**[Live Demo](https://episteme-one.vercel.app)** · [Architecture](./ARCHITECTURE.md) · [Gemini Prompts](./GEMINI_PROMPTS.md)
 
 ---
 
 ## What It Does
 
-Episteme transforms natural language descriptions into complete database schemas — not just diagrams. Type "build an inventory management system for a sneaker brand" and watch as Gemini 3 constructs an ontology, generates tables, draws relationships, stress-tests with chaos scenarios, and self-heals failures. All rendered live with build animations on an interactive canvas.
+Episteme transforms a natural-language description into a complete database system — not just a diagram. Type _"build an inventory management system for a sneaker brand"_ and Gemini 3 constructs an ontology, generates tables and relationships, and lays out an interactive ERD with a live build animation. You can then **stress-test the schema** with adversarial chaos tests that run in an in-browser SQLite sandbox, let Gemini **auto-heal** the failures with verified migration patches, and **export** the whole thing as a bundle.
 
 **This is not a chat interface.** Gemini 3 is embedded as the engine of a real tool.
 
@@ -16,13 +16,15 @@ Episteme transforms natural language descriptions into complete database schemas
 
 ## Key Features
 
-- **7-Phase AI Pipeline**: Plan → Ontology → ERD → Constraints → Actions → Verify → Auto-Fix
-- **Live Build Animation**: Watch tables, columns, and relationships construct in real time on a Lucidchart-style canvas
-- **Palantir-Inspired Ontology**: Object types, link types, action types with preconditions, transaction plans, and side effects
-- **Chaos Testing**: Automated adversarial tests — duplicate keys, null violations, orphaned records, negative values — all run in an in-browser SQLite sandbox
-- **Self-Healing Schema**: Gemini diagnoses failures and generates migration patches, verified in-sandbox with proof
-- **Interactive ERD Canvas**: Drag, zoom, pan, select, inspect — full interactive editing with React Flow
-- **One-Click Export**: SQL migrations, ontology JSON, and verification report as a downloadable bundle
+- **AI schema generation** — one structured Gemini 3 call turns a prompt into a full plan → ontology → ERD → build script, validated end-to-end with Zod.
+- **Live build animation** — watch tables, columns, and relationships assemble on a Lucidchart-style canvas, choreographed client-side from Gemini's build script.
+- **Palantir-inspired ontology** — object types, link types, and action types with preconditions, transaction plans, and side effects.
+- **Chaos testing** — automated adversarial tests (duplicate keys, NULL violations, orphaned foreign keys, CHECK violations) executed in an in-browser SQLite sandbox — no server required.
+- **Self-healing schema** — failed tests are sent back to Gemini, which proposes minimal migration patches that are applied in the sandbox and re-run for proof.
+- **Interactive ERD canvas** — drag, zoom, pan, select, inspect, and draw your own relationships with React Flow.
+- **Session persistence** — your generated schema is saved to `localStorage`, so a refresh doesn't lose your work.
+- **One-click export** — SQL schema, ontology JSON, and an HTML verification report as a downloadable ZIP.
+- **Graceful degradation** — a quota-aware local fallback generator keeps the app fully usable even when the Gemini free tier is rate-limited.
 
 ---
 
@@ -31,42 +33,35 @@ Episteme transforms natural language descriptions into complete database schemas
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
 | Framework | Next.js 16 (App Router) | SSR, API routes, Vercel-native deployment |
-| AI Engine | Gemini 3 Flash (`@google/genai` SDK) | Structured outputs, multi-step orchestration |
-| Canvas | React Flow (`@xyflow/react` v12) | Interactive ERD visualization with custom nodes/edges |
-| State | Zustand | Lightweight state management |
+| AI Engine | Gemini 3 Flash (`@google/genai` SDK) | Structured JSON outputs |
+| Canvas | React Flow (`@xyflow/react` v12) | Interactive ERD with custom nodes/edges |
+| State | Zustand | Lightweight state management + persistence |
 | DB Sandbox | sql.js (SQLite WASM) | In-browser schema testing, no server needed |
-| Validation | Zod | Type-safe structured output schemas |
-| Animation | Framer Motion | Build playback choreography |
-| Styling | Tailwind CSS v4 | Dark theme, responsive design |
+| Validation | Zod | Type-safe structured-output schemas |
+| Animation | Framer Motion | Build-playback choreography |
+| Styling | Tailwind CSS v4 | Warm, editorial light theme |
+| Testing | Vitest | Unit tests for the core generation/verification logic |
 | Deployment | Vercel (free tier) | Zero-config HTTPS deployment |
 
 All technologies are free and open source. No paid APIs or hosting required.
 
 ---
 
-## Gemini 3 API Integration
+## How Gemini 3 Is Used
 
-Episteme uses Gemini 3 Flash as the core intelligence engine across every phase of schema design:
+Episteme uses Gemini 3 Flash at two points in the pipeline, both server-side (the API key is never exposed to the browser):
 
-### Structured Outputs
-Every Gemini call returns JSON constrained by Zod schemas via `response_json_schema`. No free-form text parsing — type-safe, deterministic outputs.
+### 1. Schema generation — structured output
+A single call to `/api/generate` sends the user's prompt plus a detailed instruction schema and asks Gemini to return **one JSON document** containing the plan, ontology, ERD, and an ordered build script. The response uses `responseMimeType: "application/json"` and is validated with Zod before it ever reaches the UI. If Gemini returns malformed or unexpected JSON, the route falls back to a deterministic local generator instead of failing.
 
-### Multi-Step Orchestration
-A 7-phase pipeline where each phase's structured output feeds directly into the next phase's prompt context:
+### 2. Self-healing — AI migration patches
+When a chaos test fails, `/api/autofix` sends Gemini the failing test, the error, and the current schema, and asks for a **minimal, targeted migration** (an `ALTER TABLE`, `CREATE INDEX`, or `CREATE TRIGGER` — the sandbox is SQLite-compatible). Each patch is applied in the sql.js sandbox and the failing test is re-run to **prove** the fix before it's accepted.
 
-```
-User Prompt → Plan → Ontology → ERD → Constraints → Actions → Verify → Auto-Fix
-```
+### Verification is deterministic and client-side
+Chaos tests are **not** generated by the LLM — they're derived deterministically from the ERD's constraints and executed locally in sql.js. This keeps verification fast, free, and reproducible.
 
-### Thinking Levels
-- `HIGH` for generation phases (deep reasoning for schema design decisions)
-- `LOW` for validation phases (fast, focused fixes)
-
-### Self-Healing Loop
-Failed chaos tests are sent back to Gemini with full context (test SQL, error message, expected vs actual). Gemini diagnoses root causes and generates minimal migration SQL. Patches are applied in the sql.js sandbox and tests rerun for proof.
-
-### Graceful Degradation
-Quota-aware fallback system with local deterministic schema generation when rate limits (429s) are hit — ensures the demo never breaks.
+### Graceful degradation
+The Gemini client tracks quota/rate-limit responses (`429` / `RESOURCE_EXHAUSTED`), applies a short local cooldown, and lets both routes fall back to local generation/patching so the demo never hard-fails.
 
 ---
 
@@ -74,52 +69,40 @@ Quota-aware fallback system with local deterministic schema generation when rate
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│                         EPISTEME UI                               │
+│                          EPISTEME UI                              │
 │  ┌───────────────────────────────────────────────────────────┐   │
-│  │                     TOP BAR                                │   │
-│  │  [Prompt Input] [Generate] [Simulate] [Auto-Fix] [Export] │   │
-│  │  [════════════Phase Progress Bar════════════]              │   │
+│  │  TOP BAR: [Prompt] [Generate] [Simulate] [Auto-Fix] [Export]  │
+│  │  [══════════════ Phase Progress ══════════════]              │  │
 │  └───────────────────────────────────────────────────────────┘   │
 │  ┌──────────┐ ┌──────────────────────────────┐ ┌─────────────┐  │
-│  │ ONTOLOGY │ │      ERD CANVAS              │ │  INSPECTOR  │  │
-│  │ SIDEBAR  │ │      (React Flow)            │ │  PANEL      │  │
-│  │          │ │                              │ │             │  │
-│  │ Objects  │ │  ┌──────┐    ┌──────┐        │ │ Table info  │  │
-│  │ Links    │ │  │Table │───>│Table │        │ │ Columns     │  │
-│  │ Actions  │ │  └──────┘    └──────┘        │ │ Constraints │  │
-│  │          │ │       \       /               │ │ Actions     │  │
-│  │          │ │       ┌──────┐               │ │ Confidence  │  │
-│  │          │ │       │Table │               │ │             │  │
-│  │          │ │       └──────┘               │ │             │  │
+│  │ ONTOLOGY │ │        ERD CANVAS            │ │  INSPECTOR  │  │
+│  │ SIDEBAR  │ │        (React Flow)         │ │  PANEL      │  │
 │  └──────────┘ └──────────────────────────────┘ └─────────────┘  │
 │  ┌───────────────────────────────────────────────────────────┐   │
-│  │               SIMULATION DRAWER                            │   │
-│  │  Passed: 24  Failed: 3  │ Incident Timeline...            │   │
+│  │  SIMULATION DRAWER: Passed / Failed · Incident timeline    │  │
 │  └───────────────────────────────────────────────────────────┘   │
 └──────────────────────────────────────────────────────────────────┘
-                             │
-                   API Routes (Next.js)
-                             │
-        ┌────────────────────┼────────────────────┐
-        │                    │                    │
-   /api/generate        /api/simulate        /api/autofix
-        │                    │                    │
-        ▼                    ▼                    ▼
- ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
- │  Gemini 3    │   │   sql.js     │   │  Gemini 3    │
- │  Flash API   │   │   (WASM)     │   │  Flash API   │
- │  Structured  │   │   In-Browser │   │  Patch       │
- │  Output      │   │   SQLite     │   │  Generation  │
- └──────────────┘   └──────────────┘   └──────────────┘
+                              │
+                    Next.js API routes
+        ┌─────────────────────┼─────────────────────┐
+        ▼                     ▼                     ▼
+  /api/generate         /api/autofix           /api/export
+        │                     │                     │
+        ▼                     ▼                     ▼
+   Gemini 3 Flash        Gemini 3 Flash        ZIP bundle
+   (structured JSON)     (migration patches)   (SQL/JSON/report)
+
+  Verification runs in the browser: sql.js (SQLite WASM) executes
+  deterministic chaos tests against the generated schema.
 ```
 
-For detailed architecture documentation, see [ARCHITECTURE.md](./ARCHITECTURE.md).
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full data flow.
 
 ---
 
 ## Ontology Model
 
-Inspired by [Palantir Foundry's Ontology](https://www.palantir.com/platforms/foundry/) architecture:
+Inspired by [Palantir Foundry's Ontology](https://www.palantir.com/platforms/foundry/):
 
 | Concept | Description |
 |---------|-------------|
@@ -133,7 +116,7 @@ Inspired by [Palantir Foundry's Ontology](https://www.palantir.com/platforms/fou
 ## Local Development
 
 ### Prerequisites
-- Node.js 18+
+- Node.js 18.18+
 - npm
 
 ### Setup
@@ -142,48 +125,56 @@ Inspired by [Palantir Foundry's Ontology](https://www.palantir.com/platforms/fou
 git clone https://github.com/BhavyaAk25/Episteme.git
 cd Episteme
 npm install
+cp .env.example .env.local   # then add your Gemini API key
 ```
 
 ### Environment Variables
 
-Create a `.env.local` file in the project root:
+`.env.local`:
 
 ```
 GEMINI_API_KEY=your_gemini_api_key_here
 GEMINI_MODEL=gemini-3-flash-preview
 ```
 
-Get a free Gemini API key at [Google AI Studio](https://aistudio.google.com/apikey).  
-`GEMINI_MODEL` is optional but recommended in production so deployments stay explicit and reproducible.
+Get a free key at [Google AI Studio](https://aistudio.google.com/apikey). `GEMINI_MODEL` is optional (defaults to `gemini-3-flash-preview`) but recommended in production so deployments stay explicit and reproducible. Without a key, the app still runs entirely on the local fallback generator.
 
 ### Run
 
 ```bash
-npm run dev
+npm run dev        # start the dev server at http://localhost:3000
+npm run lint       # eslint
+npm run typecheck  # tsc --noEmit
+npm test           # vitest unit tests
+npm run build      # production build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+---
+
+## Testing
+
+Core generation and verification logic is covered by [Vitest](https://vitest.dev) unit tests:
+
+- `src/lib/ontology/transformer.test.ts` — ERD → SQL / nodes / edges
+- `src/lib/simulation/sqlGenerator.test.ts` — PostgreSQL → SQLite schema generation
+- `src/lib/simulation/chaosTests.test.ts` — deterministic adversarial test generation
+- `src/lib/gemini/fallbackGeneration.test.ts` — domain classifier + fallback integrity
+
+```bash
+npm test
+```
 
 ---
 
 ## Deployment
 
-This is a standard Next.js project. Deploy to Vercel:
+Standard Next.js — deploy to Vercel:
 
-1. Import the GitHub repo at [vercel.com/new](https://vercel.com/new)
-2. Set Environment Variables:
-   - `GEMINI_API_KEY` (required)
-   - `GEMINI_MODEL` (recommended, e.g. `gemini-3-flash-preview`)
-3. Deploy — Vercel auto-detects Next.js
+1. Import the GitHub repo at [vercel.com/new](https://vercel.com/new).
+2. Set environment variables: `GEMINI_API_KEY` (required), `GEMINI_MODEL` (recommended).
+3. Deploy — Vercel auto-detects Next.js.
 
-The `sql-wasm.js` and `sql-wasm.wasm` files in `public/` are served as static assets automatically.
-
-### Generate endpoint readiness checklist
-
-- `GEMINI_API_KEY` exists in Vercel Project Settings -> Environment Variables.
-- `GEMINI_MODEL` is set to a valid model name for your Google project.
-- Redeploy after changing environment variables.
-- If Gemini is unavailable, `/api/generate` now returns a local fallback schema with warning metadata instead of failing hard.
+The `sql-wasm.js` and `sql-wasm.wasm` files in `public/` are served as static assets automatically. If Gemini is unavailable or rate-limited, `/api/generate` returns a local fallback schema with warning metadata instead of failing.
 
 ---
 
@@ -192,41 +183,33 @@ The `sql-wasm.js` and `sql-wasm.wasm` files in `public/` are served as static as
 ```
 episteme/
 ├── src/
-│   ├── app/                    # Next.js App Router
+│   ├── app/
 │   │   ├── page.tsx            # Main application page
 │   │   ├── layout.tsx          # Root layout
-│   │   └── api/                # Server-side API routes
-│   │       ├── generate/       # Gemini schema generation
-│   │       ├── simulate/       # Chaos test execution
-│   │       ├── autofix/        # Self-healing patches
-│   │       └── export/         # Schema export bundle
+│   │   ├── globals.css         # Global styles + Tailwind
+│   │   └── api/
+│   │       ├── generate/       # Gemini schema generation (+ local fallback)
+│   │       ├── autofix/        # Gemini self-healing patches
+│   │       └── export/         # Export bundle (ZIP)
 │   ├── components/
-│   │   ├── canvas/             # ERD visualization (React Flow)
-│   │   ├── sidebar/            # Ontology explorer
+│   │   ├── canvas/             # ERD visualization + build animation (React Flow)
+│   │   ├── sidebar/            # Ontology explorer + templates
 │   │   ├── inspector/          # Entity detail panel
-│   │   ├── topbar/             # Controls and prompt input
-│   │   ├── simulation/         # Chaos test results drawer
-│   │   └── export/             # Export modal
+│   │   ├── topbar/             # Controls, prompt input, phase progress
+│   │   ├── simulation/         # Chaos-test drawer, incidents, patch diffs
+│   │   ├── export/             # Export modal
+│   │   └── shared/             # Status tags, loading states
 │   ├── lib/
-│   │   ├── gemini/             # Gemini API client, prompts, schemas
-│   │   ├── ontology/           # Data model and transformers
-│   │   ├── simulation/         # sql.js sandbox and test logic
-│   │   ├── autofix/            # Patch generation and verification
-│   │   └── export/             # SQL, JSON, and report exporters
-│   ├── store/                  # Zustand state management
-│   └── types/                  # TypeScript type definitions
-├── public/
-│   ├── brand/                  # Logo assets
-│   ├── sql-wasm.js             # SQLite WASM runtime
-│   └── sql-wasm.wasm           # SQLite WASM binary
-├── docs/                       # Additional documentation
+│   │   ├── gemini/             # Client, prompts, Zod schemas, local fallback
+│   │   ├── ontology/           # ERD ↔ React Flow + SQL transformers
+│   │   └── simulation/         # sql.js sandbox, seeding, chaos tests, auto-fix
+│   ├── store/                  # Zustand stores (project, canvas, simulation, UI)
+│   └── types/                  # Shared TypeScript types
+├── public/                     # Brand assets + sql.js WASM runtime
 ├── ARCHITECTURE.md             # System architecture
 ├── GEMINI_PROMPTS.md           # All Gemini system prompts
-├── DEMO_SCRIPT.md              # 3-minute demo walkthrough
-└── SETUP_GUIDE.md              # Development setup guide
+└── README.md
 ```
-
----
 
 ---
 

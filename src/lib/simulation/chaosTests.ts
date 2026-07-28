@@ -62,16 +62,69 @@ function inferInvalidForeignKeyLiteral(column: Column): string {
   return asSqlString("__missing_fk_reference__");
 }
 
-function inferCheckViolationLiteral(column: Column): string {
-  const upperType = column.dataType.toUpperCase();
+/**
+ * Derive a value that genuinely violates a CHECK expression.
+ *
+ * The previous implementation always injected `-1` for numeric columns, assuming
+ * every CHECK meant "must be positive". That produces false failures for checks
+ * like `discount <= 100` or `status IN (...)`, where `-1` actually satisfies the
+ * constraint. Here we parse common patterns and only emit a test when we can
+ * construct a value we are confident violates the rule — otherwise we skip it.
+ */
+function deriveCheckViolation(
+  constraint: TableConstraint,
+  insertableColumns: Column[]
+): { column: Column; value: string } | null {
+  const expression = constraint.expression?.trim();
+  if (!expression) return null;
 
-  if (columnTypeIsInteger(column.dataType) || upperType.includes("NUMERIC") || upperType.includes("DECIMAL")) {
-    return "-1";
+  const findColumn = (name: string): Column | undefined =>
+    insertableColumns.find((column) => column.name.toLowerCase() === name.toLowerCase());
+
+  // col > N | col >= N | col < N | col <= N
+  const comparison = expression.match(
+    /([a-z_][a-z0-9_]*)\s*(>=|<=|>|<)\s*(-?\d+(?:\.\d+)?)/i
+  );
+  if (comparison) {
+    const column = findColumn(comparison[1]);
+    const bound = Number(comparison[3]);
+    if (column && Number.isFinite(bound)) {
+      const operator = comparison[2];
+      // Choose a value on the forbidden side of the boundary.
+      const value =
+        operator === ">"
+          ? bound // col > bound is violated by bound itself
+          : operator === ">="
+            ? bound - 1
+            : operator === "<"
+              ? bound // col < bound is violated by bound itself
+              : bound + 1; // col <= bound is violated by bound + 1
+      return { column, value: String(value) };
+    }
   }
-  if (upperType.includes("BOOL")) {
-    return "0";
+
+  // col BETWEEN A AND B  ->  A - 1 falls below the range
+  const between = expression.match(
+    /([a-z_][a-z0-9_]*)\s+BETWEEN\s+(-?\d+(?:\.\d+)?)\s+AND\s+-?\d+(?:\.\d+)?/i
+  );
+  if (between) {
+    const column = findColumn(between[1]);
+    const low = Number(between[2]);
+    if (column && Number.isFinite(low)) {
+      return { column, value: String(low - 1) };
+    }
   }
-  return asSqlString("");
+
+  // col IN ('a', 'b', ...)  ->  a value guaranteed to be outside the set
+  const inClause = expression.match(/([a-z_][a-z0-9_]*)\s+IN\s*\(/i);
+  if (inClause) {
+    const column = findColumn(inClause[1]);
+    if (column) {
+      return { column, value: asSqlString("__episteme_invalid__") };
+    }
+  }
+
+  return null;
 }
 
 function valueForColumn(
@@ -147,22 +200,13 @@ function buildCheckViolationSql(
   constraint: TableConstraint,
   variant: number
 ): string | null {
-  const columns = getInsertableColumns(table);
-  const targetColumnName = constraint.columns.find((columnName) =>
-    columns.some((column) => column.name === columnName)
-  );
-
-  if (!targetColumnName) {
-    return null;
-  }
-
-  const targetColumn = columns.find((column) => column.name === targetColumnName);
-  if (!targetColumn) {
+  const violation = deriveCheckViolation(constraint, getInsertableColumns(table));
+  if (!violation) {
     return null;
   }
 
   return buildInsertStatement(table, variant, {
-    [targetColumn.name]: inferCheckViolationLiteral(targetColumn),
+    [violation.column.name]: violation.value,
   });
 }
 

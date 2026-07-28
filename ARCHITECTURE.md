@@ -4,66 +4,53 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        EPISTEME UI                              │
+│                          EPISTEME UI                            │
 │  ┌──────────────────────────────────────────────────────────┐   │
-│  │                    TOP BAR                                │   │
-│  │  [Prompt Input] [Generate] [Simulate] [Auto-Fix] [Export]│   │
-│  │  [═══════════Phase Progress Bar═══════════]               │   │
+│  │  TOP BAR: [Prompt] [Generate] [Simulate] [Auto-Fix] [Export] │
+│  │  [═══════════ Phase Progress ═══════════]                  │  │
 │  └──────────────────────────────────────────────────────────┘   │
 │  ┌─────────┐ ┌─────────────────────────────┐ ┌──────────────┐  │
-│  │ ONTOLOGY│ │     ERD CANVAS              │ │  INSPECTOR   │  │
-│  │ SIDEBAR │ │     (React Flow)            │ │  PANEL       │  │
-│  │         │ │                             │ │              │  │
-│  │ Objects │ │  ┌──────┐    ┌──────┐       │ │ Table details│  │
-│  │ Links   │ │  │Table │───>│Table │       │ │ Columns      │  │
-│  │ Actions │ │  └──────┘    └──────┘       │ │ Constraints  │  │
-│  │         │ │       \      /              │ │ Actions      │  │
-│  │         │ │      ┌──────┐               │ │ Confidence   │  │
-│  │         │ │      │Table │               │ │              │  │
-│  │         │ │      └──────┘               │ │              │  │
+│  │ ONTOLOGY│ │        ERD CANVAS           │ │  INSPECTOR   │  │
+│  │ SIDEBAR │ │        (React Flow)         │ │  PANEL       │  │
 │  └─────────┘ └─────────────────────────────┘ └──────────────┘  │
 │  ┌──────────────────────────────────────────────────────────┐   │
-│  │              SIMULATION DRAWER                            │   │
-│  │  ✅ Passed: 24  ❌ Failed: 3  │ Incident Timeline...     │   │
+│  │  SIMULATION DRAWER: ✅ Passed  ❌ Failed  · Incidents      │  │
 │  └──────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
                               │
-                    API Routes (Next.js)
-                              │
+                    Next.js API routes
          ┌────────────────────┼────────────────────┐
-         │                    │                    │
-    /api/generate        /api/simulate        /api/autofix
+         ▼                    ▼                    ▼
+   /api/generate        /api/autofix          /api/export
          │                    │                    │
          ▼                    ▼                    ▼
-  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
-  │  Gemini 3    │   │   sql.js     │   │  Gemini 3    │
-  │  Flash API   │   │   (WASM)     │   │  Flash API   │
-  │              │   │   In-Browser │   │              │
-  │ Structured   │   │   SQLite     │   │ Patch        │
-  │ Output       │   │   Sandbox    │   │ Generation   │
-  └──────────────┘   └──────────────┘   └──────────────┘
+  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+  │  Gemini 3    │    │  Gemini 3    │    │  ZIP bundle  │
+  │  Flash       │    │  Flash       │    │  SQL / JSON  │
+  │  structured  │    │  migration   │    │  / report    │
+  │  JSON output │    │  patches     │    │              │
+  └──────────────┘    └──────────────┘    └──────────────┘
+
+  Verification is client-side: sql.js (SQLite WASM) runs deterministic
+  chaos tests in the browser — no verification server round-trip.
 ```
 
 ## Gemini 3 Integration Points
 
-### 1. Schema Generation (Structured Outputs)
-Gemini 3 Flash generates the complete ontology + ERD using JSON-schema-constrained output.
-We define Zod schemas that map directly to Gemini's `response_json_schema` parameter.
+### 1. Schema generation — structured output
+`/api/generate` sends the user prompt plus an explicit JSON instruction schema and asks Gemini 3 Flash for a **single** structured response containing `plan`, `ontology`, `erd`, and an ordered `build_steps` array. The call sets `responseMimeType: "application/json"`, and the payload is validated with **Zod** before reaching the UI. Malformed or unexpected responses trigger a deterministic local fallback rather than an error.
 
-### 2. Multi-Step Orchestration (Function Calling)
-The pipeline runs in phases: Plan → Ontology → ERD → Constraints → Actions.
-Each phase's output feeds into the next, using Gemini 3's thought signatures to maintain reasoning context.
+### 2. Self-healing — AI migration patches
+`/api/autofix` receives failing chaos tests plus the current schema and asks Gemini for a **minimal, targeted migration** (SQLite-compatible `ALTER TABLE` / `CREATE INDEX` / `CREATE TRIGGER`). Each patch is applied in the sql.js sandbox and the failing test is re-run to prove the fix. When Gemini is unavailable, deterministic fallback patches are generated from the SQLite error messages.
 
-### 3. Streaming Build Animation
-Gemini's streaming API drives the real-time canvas animation as the schema constructs itself.
+### 3. Build animation (client-side)
+The build animation is **not** token streaming. Gemini returns an ordered `build_steps` array once, and the frontend choreographs it locally with `requestAnimationFrame` + Framer Motion. This is more reliable and visually smoother than streaming partial tokens.
 
-### 4. Self-Healing Loop (Auto-Fix)
-When chaos tests fail, Gemini receives the failure context and proposes minimal migration patches.
-Patches are applied in the sql.js sandbox, tests rerun, creating a verified fix cycle.
+### 4. Deterministic client-side verification
+Chaos tests are derived from the ERD's own constraints (UNIQUE / NOT NULL / FOREIGN KEY / CHECK) — not from the LLM — and executed in the browser via sql.js. This keeps verification fast, free, and reproducible across runs.
 
-### 5. Thinking Level Control
-- Generation phases: `thinking_level: HIGH` for deep reasoning
-- Validation phases: `thinking_level: LOW` for fast, focused fixes
+### 5. Quota resilience
+The Gemini client normalizes provider errors, detects `429` / `RESOURCE_EXHAUSTED`, applies a short local cooldown window, and exposes quota metadata so both routes can fall back to local generation/patching without hard-failing.
 
 ## Data Flow
 
@@ -71,40 +58,33 @@ Patches are applied in the sql.js sandbox, tests rerun, creating a verified fix 
 User Prompt
     │
     ▼
-Phase 1: PLAN ──── Gemini 3 structured output
-    │                 │
-    ▼                 ▼
-Phase 2: ONTOLOGY    Objects, Links, Actions, Interfaces
+/api/generate ──► Gemini 3 structured output
+    │                { plan, ontology, erd, build_steps }
+    │                     │ validated with Zod
+    ▼                     ▼
+Zustand stores ◄── plan · ontology · ERD · build script
     │
     ▼
-Phase 3: ERD ─────── Tables, Columns, Constraints, Indexes
+CANVAS ANIMATION ── React Flow renders the build script step-by-step
     │
     ▼
-Phase 4: BUILD SCRIPT ── Ordered animation steps
+SIMULATE (client) ── sql.js seeds data + runs deterministic chaos tests
     │
-    ▼
-CANVAS ANIMATION ──── React Flow renders step-by-step
+    ├── all pass ──► EXPORT (schema.sql, ontology.json, report.html)
     │
-    ▼
-Phase 5: SIMULATE ──── sql.js runs chaos tests
-    │
-    ├─── All pass? ──► EXPORT (schema.sql, ontology.json, report)
-    │
-    └─── Failures? ──► Phase 6: AUTO-FIX
-                            │
-                            ▼
-                       Gemini 3 generates patches
-                            │
-                            ▼
-                       Apply in sandbox → Rerun tests
-                            │
-                            ▼
-                       Show before/after + proof
+    └── failures ──► /api/autofix
+                          │
+                          ▼
+                     Gemini 3 proposes migration patches
+                          │
+                          ▼
+                     apply in sandbox → re-run failing tests
+                          │
+                          ▼
+                     show before/after diff + proof
 ```
 
 ## Palantir-Inspired Ontology Model
-
-Inspired by Palantir Foundry's Ontology architecture:
 
 | Palantir Concept | Episteme Equivalent | Purpose |
 |-----------------|---------------------|---------|
@@ -113,16 +93,16 @@ Inspired by Palantir Foundry's Ontology architecture:
 | Link Type | Relationship edge on canvas | Semantic connection |
 | Action Type | Action in action catalog | First-class operation with preconditions |
 | Interface | Shared behavior set | Common properties across entities (Auditable) |
-| Function | Computed/derived value | Business logic on top of objects |
 
 ## Technology Choices
 
 | Choice | Reasoning |
 |--------|-----------|
-| Next.js App Router | Vercel-native deployment, server-side API routes for secure Gemini calls |
-| React Flow (@xyflow/react) | MIT license, proven for node-based UIs, custom nodes/edges, used by Stripe |
-| sql.js (SQLite WASM) | Browser-native database sandbox, no server needed, instant schema testing |
-| Zustand | Minimal state management that integrates naturally with React Flow |
-| Framer Motion | Production-grade animations for build playback choreography |
-| Zod | TypeScript-native schema validation, directly compatible with Gemini structured outputs |
-| Tailwind CSS | Rapid dark-theme styling with design system consistency |
+| Next.js App Router | Vercel-native deployment; server-side API routes keep the Gemini key off the client |
+| React Flow (@xyflow/react) | MIT-licensed, proven for node-based ERD UIs, custom nodes/edges |
+| sql.js (SQLite WASM) | Browser-native database sandbox — instant, free schema testing with no server |
+| Zustand | Minimal state management that integrates naturally with React Flow, with `persist` for session restore |
+| Framer Motion | Production-grade animation for build-playback choreography |
+| Zod | TypeScript-native validation, directly compatible with Gemini's structured JSON |
+| Tailwind CSS | Rapid, consistent theming |
+| Vitest | Fast unit tests for the deterministic generation/verification core |
