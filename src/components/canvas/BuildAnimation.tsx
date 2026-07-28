@@ -5,9 +5,9 @@ import { useProjectStore } from "@/store/useProjectStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
 import { useUIStore } from "@/store/useUIStore";
 import { getStepDuration } from "@/lib/utils/animation";
-import { erdToNodes } from "@/lib/ontology/transformer";
+import { erdToNodes, erdToEdges } from "@/lib/ontology/transformer";
 import type { BuildStep } from "@/types/gemini";
-import type { ERDNodeData, Column, TableConstraint, TableIndex } from "@/types/erd";
+import type { ERDNodeData, ERDEdgeData, Column, TableConstraint, TableIndex } from "@/types/erd";
 
 /**
  * BuildAnimation component orchestrates the step-by-step build playback
@@ -230,12 +230,28 @@ export function BuildAnimation() {
     }
   }, [erd, ontology, addNode, updateNodeData, addEdge, setErrorWithTitle, setIsPlaying]);
 
+  // Reconcile the canvas to the full ERD once playback ends. The build script
+  // can be incomplete or mis-ordered (e.g. a relationship step whose tables
+  // hadn't been added yet is dropped), so replaying it alone can leave the
+  // canvas showing less than the real schema. Rebuilding from the ERD here
+  // guarantees the finished state always matches — while keeping user edges.
+  const finalizeCanvas = useCallback(() => {
+    if (!erd || !ontology) return;
+    const canvas = useCanvasStore.getState();
+    const userEdges = canvas.edges.filter(
+      (edge) => (edge.data as ERDEdgeData | undefined)?.edgeSource === "user"
+    );
+    canvas.setNodes(erdToNodes(erd, ontology));
+    canvas.setEdges([...erdToEdges(erd), ...userEdges]);
+  }, [erd, ontology]);
+
   // Play the next step
   const playNextStep = useCallback(() => {
     if (!buildScript || !isPlaying) return;
 
     const steps = buildScript.steps;
     if (currentBuildStep >= steps.length) {
+      finalizeCanvas();
       setIsPlaying(false);
       return;
     }
@@ -249,7 +265,7 @@ export function BuildAnimation() {
     timeoutRef.current = setTimeout(() => {
       setCurrentBuildStep(currentBuildStep + 1);
     }, duration);
-  }, [buildScript, isPlaying, currentBuildStep, playbackSpeed, processStep, setCurrentBuildStep, setIsPlaying]);
+  }, [buildScript, isPlaying, currentBuildStep, playbackSpeed, processStep, finalizeCanvas, setCurrentBuildStep, setIsPlaying]);
 
   // Effect to drive the animation
   useEffect(() => {
