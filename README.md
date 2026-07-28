@@ -52,7 +52,7 @@ All technologies are free and open source. No paid APIs or hosting required.
 Episteme uses Gemini 3 Flash at two points in the pipeline, both server-side (the API key is never exposed to the browser):
 
 ### 1. Schema generation — structured output
-A single call to `/api/generate` sends the user's prompt plus a detailed instruction schema and asks Gemini to return **one JSON document** containing the plan, ontology, ERD, and an ordered build script. The response uses `responseMimeType: "application/json"` and is validated with Zod before it ever reaches the UI. If Gemini returns malformed or unexpected JSON, the route falls back to a deterministic local generator instead of failing.
+A single call to `/api/generate` sends the user's prompt plus a detailed instruction schema and asks Gemini to return **one JSON document** containing the plan, ontology, and ERD. The response uses `responseMimeType: "application/json"` and is validated with Zod before it ever reaches the UI. The build-animation script is then derived deterministically from that ERD. If Gemini returns malformed or unexpected JSON, the route falls back to a deterministic local generator instead of failing.
 
 ### 2. Self-healing — AI migration patches
 When a chaos test fails, `/api/autofix` sends Gemini the failing test, the error, and the current schema, and asks for a **minimal, targeted migration** (an `ALTER TABLE`, `CREATE INDEX`, or `CREATE TRIGGER` — the sandbox is SQLite-compatible). Each patch is applied in the sql.js sandbox and the failing test is re-run to **prove** the fix before it's accepted.
@@ -67,36 +67,51 @@ The Gemini client tracks quota/rate-limit responses (`429` / `RESOURCE_EXHAUSTED
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                          EPISTEME UI                              │
-│  ┌───────────────────────────────────────────────────────────┐   │
-│  │  TOP BAR: [Prompt] [Generate] [Simulate] [Auto-Fix] [Export]  │
-│  │  [══════════════ Phase Progress ══════════════]              │  │
-│  └───────────────────────────────────────────────────────────┘   │
-│  ┌──────────┐ ┌──────────────────────────────┐ ┌─────────────┐  │
-│  │ ONTOLOGY │ │        ERD CANVAS            │ │  INSPECTOR  │  │
-│  │ SIDEBAR  │ │        (React Flow)         │ │  PANEL      │  │
-│  └──────────┘ └──────────────────────────────┘ └─────────────┘  │
-│  ┌───────────────────────────────────────────────────────────┐   │
-│  │  SIMULATION DRAWER: Passed / Failed · Incident timeline    │  │
-│  └───────────────────────────────────────────────────────────┘   │
-└──────────────────────────────────────────────────────────────────┘
-                              │
-                    Next.js API routes
-        ┌─────────────────────┼─────────────────────┐
-        ▼                     ▼                     ▼
-  /api/generate         /api/autofix           /api/export
-        │                     │                     │
-        ▼                     ▼                     ▼
-   Gemini 3 Flash        Gemini 3 Flash        ZIP bundle
-   (structured JSON)     (migration patches)   (SQL/JSON/report)
+```mermaid
+flowchart TB
+    User(["🧑 User types a plain-English prompt"]):::user
 
-  Verification runs in the browser: sql.js (SQLite WASM) executes
-  deterministic chaos tests against the generated schema.
+    subgraph Browser["Browser · Next.js UI — React Flow · Zustand · Framer Motion"]
+        direction TB
+        UI["Top bar &nbsp;·&nbsp; Ontology sidebar &nbsp;·&nbsp; ERD canvas + build animation &nbsp;·&nbsp; Inspector &nbsp;·&nbsp; Simulation drawer"]
+        Sandbox[["sql.js sandbox — SQLite WASM<br/>deterministic chaos tests, in-browser"]]
+    end
+
+    subgraph Server["Next.js API routes · server-side — API key never reaches the client"]
+        direction LR
+        Generate["/api/generate"]
+        Autofix["/api/autofix"]
+        Export["/api/export"]
+    end
+
+    Gemini["✦ Gemini 3 Flash<br/>structured JSON output"]:::ai
+    Fallback{{"Local fallback<br/>generator"}}:::fb
+    Zip[["schema.sql · ontology.json<br/>verification_report.html"]]
+
+    User --> UI
+    UI -- "Generate" --> Generate
+    UI -- "Auto-Fix" --> Autofix
+    UI -- "Simulate" --> Sandbox
+    UI -- "Export" --> Export
+
+    Generate --> Gemini
+    Generate -. "quota / error" .-> Fallback
+    Gemini -- "plan · ontology · ERD<br/>(Zod-validated)" --> UI
+    Fallback --> UI
+
+    Autofix --> Gemini
+    Gemini -- "migration patch" --> Sandbox
+    Sandbox -- "re-run failing test = proof" --> UI
+
+    Export --> Zip
+    Zip --> User
+
+    classDef ai fill:#B8976A,stroke:#7c6642,color:#ffffff;
+    classDef user fill:#f0e1cc,stroke:#8B7355,color:#3D3425;
+    classDef fb fill:#fff3e0,stroke:#e0a96d,color:#7a5a2e;
 ```
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full data flow.
+**In one line:** the browser calls three server routes — `/api/generate` (Gemini structured output, with a local fallback), `/api/autofix` (Gemini migration patches), and `/api/export` (ZIP bundle) — while all **verification runs in the browser** via a sql.js SQLite sandbox. See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full data flow.
 
 ---
 
@@ -158,7 +173,7 @@ Core generation and verification logic is covered by [Vitest](https://vitest.dev
 - `src/lib/ontology/transformer.test.ts` — ERD → SQL / nodes / edges
 - `src/lib/simulation/sqlGenerator.test.ts` — PostgreSQL → SQLite schema generation
 - `src/lib/simulation/chaosTests.test.ts` — deterministic adversarial test generation
-- `src/lib/gemini/fallbackGeneration.test.ts` — domain classifier + fallback integrity
+- `src/lib/gemini/fallbackGeneration.test.ts` — domain classifier, fallback integrity, and the replay-script contract
 
 ```bash
 npm test
