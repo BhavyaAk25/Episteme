@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { callGemini, getGeminiConfigStatus, getGeminiErrorInfo } from "@/lib/gemini/client";
-import { createFallbackGeneration } from "@/lib/gemini/fallbackGeneration";
+import { createFallbackGeneration, buildScriptFromErd } from "@/lib/gemini/fallbackGeneration";
 import { GENERATION_PROMPT } from "@/lib/gemini/prompts";
 import { GenerationResponseSchema } from "@/lib/gemini/schemas";
 import type { GenerationResponse as GeminiGenerationResponse } from "@/lib/gemini/schemas";
 import type { Ontology } from "@/types/ontology";
 import type { ERD } from "@/types/erd";
-import type { Plan, BuildScript, BuildStep } from "@/types/gemini";
+import type { Plan } from "@/types/gemini";
 
 type TemplateId = "inventory" | "ecommerce" | "saas";
 type FallbackReason = "quota" | "parse_error" | "validation_error" | "provider_error" | "config_error";
@@ -544,24 +544,13 @@ export async function POST(request: Request) {
       })),
     };
 
-    const buildScript: BuildScript = {
-      steps: (typedData.build_steps || []).map((s: {
-        order: number;
-        type: string;
-        target_table: string | null;
-        data: Record<string, unknown>;
-        phase: string;
-      }) => ({
-        order: s.order,
-        type: s.type as BuildStep["type"],
-        targetTable: s.target_table,
-        data: s.data,
-        phase: s.phase as BuildStep["phase"],
-      })),
-    };
-
     const cleanErd = sanitizeERD(erd);
     const reconciledOntology = reconcileOntologyWithErd(ontology, cleanErd);
+
+    // Derive the replay script deterministically from the sanitized ERD rather
+    // than trusting Gemini's build_steps, whose `data` payload is frequently
+    // empty and would make the build animation render nothing.
+    const buildScript = buildScriptFromErd(cleanErd);
 
     return NextResponse.json({
       plan,

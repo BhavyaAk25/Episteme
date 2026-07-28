@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { createFallbackGeneration, detectFallbackDomain } from "./fallbackGeneration";
+import {
+  createFallbackGeneration,
+  detectFallbackDomain,
+  buildScriptFromErd,
+} from "./fallbackGeneration";
 
 describe("detectFallbackDomain", () => {
   it("honors an explicit template id", () => {
@@ -51,5 +55,33 @@ describe("createFallbackGeneration", () => {
     });
     expect(payload.geminiAttempted).toBe(true);
     expect(payload.fallbackReason).toBe("quota");
+  });
+});
+
+describe("buildScriptFromErd", () => {
+  const erd = createFallbackGeneration("inventory system", { templateId: "inventory" }).erd;
+  const steps = buildScriptFromErd(erd).steps;
+
+  it("produces steps whose data shape matches the animation processor", () => {
+    const addTable = steps.find((step) => step.type === "add_table");
+    expect(typeof addTable?.data.table_name).toBe("string");
+
+    const addColumn = steps.find((step) => step.type === "add_column");
+    expect(typeof addColumn?.data.table_name).toBe("string");
+    expect(typeof addColumn?.data.column).toBe("object");
+
+    const addRelationship = steps.find((step) => step.type === "add_relationship");
+    if (addRelationship) {
+      expect(typeof addRelationship.data.from_table).toBe("string");
+      expect(typeof addRelationship.data.to_table).toBe("string");
+    }
+  });
+
+  it("emits an add_table step for every table in the ERD", () => {
+    const tableNames = new Set(erd.tables.map((table) => table.name));
+    const stepTableNames = steps
+      .filter((step) => step.type === "add_table")
+      .map((step) => step.data.table_name as string);
+    expect(stepTableNames.sort()).toEqual([...tableNames].sort());
   });
 });

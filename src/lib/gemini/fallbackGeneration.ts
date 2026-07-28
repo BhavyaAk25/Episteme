@@ -220,6 +220,18 @@ function buildFallbackScript(erd: ERD): BuildScript {
 }
 
 /**
+ * Build a deterministic replay script from an ERD.
+ *
+ * Used for every generation — including live Gemini results — because the model's
+ * own `build_steps` payload is unreliable (the prompt leaves `data` unspecified,
+ * so steps often arrive empty and the animation renders nothing). Deriving the
+ * script from the final ERD guarantees the replay always has correct data.
+ */
+export function buildScriptFromErd(erd: ERD): BuildScript {
+  return buildFallbackScript(erd);
+}
+
+/**
  * Validate fallback ERD integrity:
  * - Every relationship references existing tables and columns
  * - Every FK column has a valid referencesTable/referencesColumn
