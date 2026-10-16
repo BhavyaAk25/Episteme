@@ -57,11 +57,11 @@
   --font-mono: var(--font-jetbrains-mono);
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+/*
+ * Note: no global `* { margin: 0; padding: 0 }` reset here. Tailwind's
+ * preflight already resets these inside @layer base; an unlayered reset
+ * would override every p-* / m-* utility class in the app.
+ */
 
 html, body {
   height: 100%;
@@ -130,73 +130,75 @@ body {
 
 /* Let custom edge components control their own stroke colors */
 
-.ui-card {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--bg-surface);
-  box-shadow: var(--surface-shadow-soft);
-}
+@layer components {
+  .ui-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+    box-shadow: var(--surface-shadow-soft);
+  }
 
-.ui-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  height: 30px;
-  padding-inline: var(--space-3);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  font-size: var(--text-meta);
-  font-weight: 600;
-}
+  .ui-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    height: 30px;
+    padding-inline: var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    font-size: var(--text-meta);
+    font-weight: 600;
+  }
 
-.ui-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-height: 24px;
-  padding-inline: 10px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  font-size: 0.675rem;
-  font-weight: 600;
-}
+  .ui-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-height: 24px;
+    padding-inline: 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    font-size: 0.675rem;
+    font-weight: 600;
+  }
 
-.ui-section-title {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #8B7355;
-  font-weight: 600;
-}
+  .ui-section-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #8B7355;
+    font-weight: 600;
+  }
 
-.ui-ghost-btn {
-  border: 1px solid rgba(0,0,0,0.15);
-  border-radius: 8px;
-  background: white;
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 600;
-  min-height: 36px;
-  padding: 8px 20px;
-}
+  .ui-ghost-btn {
+    border: 1px solid rgba(0,0,0,0.15);
+    border-radius: 8px;
+    background: white;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+    min-height: 36px;
+    padding: 8px 20px;
+  }
 
-.ui-ghost-btn:hover {
-  background: var(--bg-node);
-}
+  .ui-ghost-btn:hover {
+    background: var(--bg-node);
+  }
 
-.ui-primary-btn {
-  border: none;
-  border-radius: 8px;
-  background: #B8976A;
-  color: white;
-  font-size: 13px;
-  font-weight: 600;
-  min-height: 36px;
-  padding: 8px 20px;
-}
+  .ui-primary-btn {
+    border: none;
+    border-radius: 8px;
+    background: #B8976A;
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    min-height: 36px;
+    padding: 8px 20px;
+  }
 
-.ui-primary-btn:hover {
-  filter: brightness(0.93);
+  .ui-primary-btn:hover {
+    filter: brightness(0.93);
+  }
 }
 
 .react-flow__attribution {

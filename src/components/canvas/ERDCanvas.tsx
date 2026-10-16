@@ -15,9 +15,9 @@ import "@xyflow/react/dist/style.css";
 import { useCanvasStore } from "@/store/useCanvasStore";
 import { useUIStore } from "@/store/useUIStore";
 import { useProjectStore } from "@/store/useProjectStore";
-import { CanvasLoadingSkeleton } from "@/components/shared/LoadingStates";
 import { ERDTableNode } from "./ERDTableNode";
 import { ERDRelationEdge } from "./ERDRelationEdge";
+import { CanvasAutoFit, CANVAS_FIT_OPTIONS } from "./CanvasAutoFit";
 import type { ERDEdgeData } from "@/types/erd";
 
 const nodeTypes = {
@@ -44,7 +44,7 @@ export function ERDCanvas() {
   } = useCanvasStore();
 
   const { openInspector } = useUIStore();
-  const { isGenerating, buildScript } = useProjectStore();
+  const { isGenerating, buildScript, generationError } = useProjectStore();
   const hasReplayScript = Boolean(buildScript && buildScript.steps.length > 0);
 
   const onNodeClick: NodeMouseHandler = useCallback(
@@ -124,7 +124,7 @@ export function ERDCanvas() {
         edgeTypes={edgeTypes}
         connectionLineStyle={{ stroke: "var(--accent-blue)", strokeWidth: 2 }}
         fitView
-        fitViewOptions={{ padding: 0.2 }}
+        fitViewOptions={CANVAS_FIT_OPTIONS}
         minZoom={0.1}
         maxZoom={2}
         defaultEdgeOptions={{
@@ -132,6 +132,7 @@ export function ERDCanvas() {
         }}
         proOptions={{ hideAttribution: true }}
       >
+        <CanvasAutoFit />
         <Background
           variant={BackgroundVariant.Dots}
           gap={20}
@@ -162,11 +163,9 @@ export function ERDCanvas() {
       </ReactFlow>
 
       {/* Empty state */}
-      {nodes.length === 0 && (
+      {nodes.length === 0 && !isGenerating && !generationError && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none dotted-grid-bg">
-          {isGenerating ? (
-            <CanvasLoadingSkeleton />
-          ) : (
+          {(
             <div className="text-center">
               <div className="flex items-center justify-center gap-4 mb-3">
                 <div className="w-16 h-16 rounded-2xl bg-surface border border-border flex items-center justify-center">

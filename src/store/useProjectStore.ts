@@ -4,6 +4,12 @@ import type { BuildPhase, BuildScript, Plan, GenerationResponse } from "@/types/
 import type { Ontology } from "@/types/ontology";
 import type { ERD } from "@/types/erd";
 
+export interface GenerationError {
+  message: string;
+  reason: string | null;
+  retryAfterSec: number | null;
+}
+
 interface ProjectState {
   // Input
   prompt: string;
@@ -14,6 +20,8 @@ interface ProjectState {
   currentPhase: BuildPhase | null;
   error: string | null;
   errorTitle: string | null;
+  generationStartedAt: number | null;
+  generationError: GenerationError | null;
 
   // Generated data
   plan: Plan | null;
@@ -39,6 +47,7 @@ interface ProjectState {
   setGenerationResult: (result: GenerationResponse) => void;
   setError: (error: string | null) => void;
   setErrorWithTitle: (title: string, error: string) => void;
+  setGenerationError: (error: GenerationError | null) => void;
   setSchemaSql: (sql: string) => void;
 
   // Animation controls
@@ -57,6 +66,8 @@ const initialState = {
   currentPhase: null,
   error: null,
   errorTitle: null,
+  generationStartedAt: null as number | null,
+  generationError: null as GenerationError | null,
   plan: null,
   ontology: null,
   erd: null,
@@ -79,16 +90,14 @@ export const useProjectStore = create<ProjectState>()(
 
   setPrompt: (prompt, templateId) => set({ prompt, templateId: templateId ?? null }),
 
+  // Only transient flags are reset here. The previous schema (and its
+  // generation metadata) stays on screen until a new one actually arrives,
+  // so a failed generation never wipes the user's work.
   startGeneration: () => set({
     isGenerating: true,
-    currentPhase: "plan",
+    generationStartedAt: Date.now(),
+    generationError: null,
     error: null,
-    generationWarning: null,
-    fallbackDomain: null,
-    generationMode: null,
-    geminiAttempted: false,
-    fallbackReason: null,
-    domainDecisionSource: null,
     currentBuildStep: 0,
     isPlaying: false,
   }),
@@ -107,6 +116,8 @@ export const useProjectStore = create<ProjectState>()(
     fallbackReason: result.fallbackReason ?? null,
     domainDecisionSource: result.domainDecisionSource ?? null,
     isGenerating: false,
+    generationStartedAt: null,
+    generationError: null,
     currentPhase: "verify",
   }),
 
@@ -114,12 +125,20 @@ export const useProjectStore = create<ProjectState>()(
     error,
     errorTitle: error ? "Error" : null,
     isGenerating: false,
+    generationStartedAt: null,
   }),
 
   setErrorWithTitle: (title, error) => set({
     error,
     errorTitle: error ? title : null,
     isGenerating: false,
+    generationStartedAt: null,
+  }),
+
+  setGenerationError: (generationError) => set({
+    generationError,
+    isGenerating: false,
+    generationStartedAt: null,
   }),
 
   setSchemaSql: (sql) => set({ schemaSql: sql }),

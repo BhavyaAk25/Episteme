@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { callGemini, getGeminiConfigStatus, getGeminiErrorInfo } from "@/lib/gemini/client";
 import { createFallbackGeneration, buildScriptFromErd } from "@/lib/gemini/fallbackGeneration";
-import { GENERATION_PROMPT } from "@/lib/gemini/prompts";
+import { GENERATION_SYSTEM_PROMPT, generationUserContent } from "@/lib/gemini/prompts";
+import { checkRateLimit, clientKey } from "@/lib/server/rateLimit";
+import { MAX_PROMPT_LENGTH } from "@/lib/limits";
 import { GenerationResponseSchema } from "@/lib/gemini/schemas";
 import type { GenerationResponse as GeminiGenerationResponse } from "@/lib/gemini/schemas";
 import type { Ontology } from "@/types/ontology";
@@ -9,6 +11,9 @@ import type { ERD } from "@/types/erd";
 import type { Plan } from "@/types/gemini";
 
 type TemplateId = "inventory" | "ecommerce" | "saas";
+
+const GENERATE_RATE_LIMIT = 10; // requests per window per client
+const GENERATE_RATE_WINDOW_MS = 60_000;
 type FallbackReason = "quota" | "parse_error" | "validation_error" | "provider_error" | "config_error";
 
 function sanitizeERD(erd: ERD): ERD {
@@ -233,13 +238,47 @@ function buildFallbackResponse(args: {
     ...fallback,
     ontology: reconciledFallbackOntology,
     erd: cleanFallbackErd,
-    warning: args.warning,
+    warning: `${args.warning.replace(/ Showing local fallback schema.*$/, "")} Showing the built-in ${args.templateId ?? "starter"} template you selected.`,
     source: "fallback",
     generationMode: "fallback",
     quotaState: args.quotaState,
     providerErrorCode: args.providerErrorCode,
     retryAfterSec: args.retryAfterSec,
   });
+}
+
+/**
+ * Called whenever Gemini could not produce a schema.
+ *
+ * If the user explicitly picked a template, we return that template (they
+ * asked for it, so it is not misleading). Otherwise we return an honest
+ * error instead of guessing a hardcoded schema for an unrelated domain.
+ */
+function respondWithoutGemini(args: Parameters<typeof buildFallbackResponse>[0]) {
+  if (args.templateId) {
+    return buildFallbackResponse(args);
+  }
+
+  const message =
+    args.reason === "config_error"
+      ? "The AI model isn't configured on this deployment (GEMINI_API_KEY is missing), so a schema can't be generated from your description."
+      : args.reason === "quota"
+        ? "The AI model's free-tier quota is used up right now, so your schema couldn't be generated."
+        : args.reason === "parse_error" || args.reason === "validation_error"
+          ? "The AI model returned a response that wasn't a valid schema."
+          : "The AI model couldn't be reached.";
+
+  return NextResponse.json(
+    {
+      error: message,
+      errorCode: "GENERATION_UNAVAILABLE",
+      reason: args.reason,
+      providerErrorCode: args.providerErrorCode,
+      retryAfterSec: args.retryAfterSec,
+      quotaState: args.quotaState,
+    },
+    { status: 503 }
+  );
 }
 
 export async function POST(request: Request) {
@@ -277,9 +316,28 @@ export async function POST(request: Request) {
       );
     }
 
+    if (prompt.length > MAX_PROMPT_LENGTH) {
+      return NextResponse.json(
+        { error: `Description is too long (${prompt.length} characters). Keep it under ${MAX_PROMPT_LENGTH}.` },
+        { status: 400 }
+      );
+    }
+
+    const limit = checkRateLimit(clientKey(request, "generate"), GENERATE_RATE_LIMIT, GENERATE_RATE_WINDOW_MS);
+    if (!limit.allowed) {
+      return NextResponse.json(
+        {
+          error: "Too many generation requests. Please wait a moment and try again.",
+          errorCode: "RATE_LIMITED",
+          retryAfterSec: limit.retryAfterSec,
+        },
+        { status: 429, headers: { "Retry-After": String(limit.retryAfterSec) } }
+      );
+    }
+
     const configStatus = getGeminiConfigStatus();
     if (!configStatus.ready) {
-      return buildFallbackResponse({
+      return respondWithoutGemini({
         prompt,
         templateId,
         reason: "config_error",
@@ -293,11 +351,14 @@ export async function POST(request: Request) {
 
     let rawResponse: string;
     try {
-      rawResponse = await callGemini(GENERATION_PROMPT(prompt), { operation: "generate" });
+      rawResponse = await callGemini(generationUserContent(prompt), {
+        operation: "generate",
+        systemInstruction: GENERATION_SYSTEM_PROMPT,
+      });
     } catch (error) {
       const info = getGeminiErrorInfo(error);
       const isQuotaPath = info.isQuotaOrRateLimited || info.isCooldown;
-      return buildFallbackResponse({
+      return respondWithoutGemini({
         prompt,
         templateId,
         reason: isQuotaPath ? "quota" : "provider_error",
@@ -321,7 +382,7 @@ export async function POST(request: Request) {
       parsedResponse = JSON.parse(rawResponse);
     } catch {
       console.error("Failed to parse Gemini response:", rawResponse);
-      return buildFallbackResponse({
+      return respondWithoutGemini({
         prompt,
         templateId,
         reason: "parse_error",
@@ -338,7 +399,7 @@ export async function POST(request: Request) {
 
     if (!validationResult.success) {
       console.error("Validation errors:", validationResult.error.issues);
-      return buildFallbackResponse({
+      return respondWithoutGemini({
         prompt,
         templateId,
         reason: "validation_error",
@@ -353,7 +414,7 @@ export async function POST(request: Request) {
     const data = validationResult.data as GeminiGenerationResponse;
 
     if (!data?.plan || !data?.ontology || !data?.erd) {
-      return buildFallbackResponse({
+      return respondWithoutGemini({
         prompt,
         templateId,
         reason: "validation_error",
@@ -569,7 +630,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Generation error:", error);
     if (prompt) {
-      return buildFallbackResponse({
+      return respondWithoutGemini({
         prompt,
         templateId,
         reason: "provider_error",
