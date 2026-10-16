@@ -3,12 +3,19 @@
 import { memo } from "react";
 import {
   BaseEdge,
+  Position,
   EdgeLabelRenderer,
   getBezierPath,
   type EdgeProps,
 } from "@xyflow/react";
 import type { ERDEdgeData } from "@/types/erd";
 import { useCanvasStore } from "@/store/useCanvasStore";
+import { edgeEndLabels } from "@/lib/ontology/cardinality";
+
+/** Place an end label just outside the node, on whichever side the handle is. */
+function labelOffsetX(position: Position): number {
+  return position === Position.Left ? -13 : 13;
+}
 
 function ERDRelationEdgeComponent({
   id,
@@ -45,19 +52,10 @@ function ERDRelationEdgeComponent({
 
   const strokeDasharray = isUserEdge ? "8,4" : edgeData?.required ? undefined : "5,5";
 
-  // Cardinality labels
-  const sourceLabel =
-    edgeData?.cardinality === "1:1"
-      ? "1"
-      : edgeData?.cardinality === "1:N"
-      ? "1"
-      : "N";
-  const targetLabel =
-    edgeData?.cardinality === "1:1"
-      ? "1"
-      : edgeData?.cardinality === "1:N"
-      ? "N"
-      : "M";
+  // Cardinality labels: source = FK-holding table, target = referenced table.
+  const { source: sourceLabel, target: targetLabel } = edgeEndLabels(
+    edgeData?.cardinality ?? "1:N"
+  );
 
   return (
     <>
@@ -75,7 +73,7 @@ function ERDRelationEdgeComponent({
         <div
           style={{
             position: "absolute",
-            transform: `translate(-50%, -50%) translate(${sourceX + 13}px, ${
+            transform: `translate(-50%, -50%) translate(${sourceX + labelOffsetX(sourcePosition)}px, ${
               sourceY - 8
             }px)`,
             pointerEvents: "none",
@@ -89,7 +87,7 @@ function ERDRelationEdgeComponent({
         <div
           style={{
             position: "absolute",
-            transform: `translate(-50%, -50%) translate(${targetX - 13}px, ${
+            transform: `translate(-50%, -50%) translate(${targetX + labelOffsetX(targetPosition)}px, ${
               targetY - 8
             }px)`,
             pointerEvents: "none",

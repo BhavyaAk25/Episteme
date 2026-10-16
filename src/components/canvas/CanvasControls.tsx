@@ -64,7 +64,7 @@ export function CanvasControls() {
   }
 
   return (
-    <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10">
+    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
       <div className="bg-[rgba(255,252,247,0.95)] backdrop-blur-[8px] rounded-xl px-4 py-2 flex items-center gap-3 shadow-md border border-[rgba(0,0,0,0.08)]">
         {/* Play/Pause — 40px circle, warm accent */}
         <button

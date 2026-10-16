@@ -6,6 +6,7 @@ import { OntologySidebar } from "@/components/sidebar/OntologySidebar";
 import { ERDCanvas } from "@/components/canvas/ERDCanvas";
 import { BuildAnimation } from "@/components/canvas/BuildAnimation";
 import { CanvasControls } from "@/components/canvas/CanvasControls";
+import { GenerationStatus } from "@/components/canvas/GenerationStatus";
 import { RightInspector } from "@/components/inspector/RightInspector";
 import { BottomDrawer } from "@/components/simulation/BottomDrawer";
 import { ExportModal } from "@/components/export/ExportModal";
@@ -67,6 +68,7 @@ export default function Home() {
           <ERDCanvas />
           <BuildAnimation />
           <CanvasControls />
+          <GenerationStatus />
         </div>
 
         {/* Right Inspector */}

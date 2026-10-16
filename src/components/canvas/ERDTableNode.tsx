@@ -118,7 +118,7 @@ function ERDTableNodeComponent({ id, data, selected }: NodeProps) {
               {col.isForeignKey && (
                 <Handle
                   type="source"
-                  position={Position.Right}
+                  position={Position.Left}
                   id={`${col.name}-source`}
                   className="!w-2 !h-2 !bg-accent !border-0"
                 />
@@ -158,14 +158,17 @@ function ERDTableNodeComponent({ id, data, selected }: NodeProps) {
       )}
 
       {/* Connection handles */}
+      {/* Referenced tables are laid out to the left of the tables that point at
+          them, so incoming FK edges arrive on the right and outgoing FK edges
+          leave from the left. */}
       <Handle
         type="target"
-        position={Position.Left}
+        position={Position.Right}
         className="!w-3 !h-3 !bg-surface !border-2 !border-accent"
       />
       <Handle
         type="source"
-        position={Position.Right}
+        position={Position.Left}
         className="!w-3 !h-3 !bg-surface !border-2 !border-accent"
       />
     </div>

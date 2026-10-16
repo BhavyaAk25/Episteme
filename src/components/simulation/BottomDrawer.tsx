@@ -223,10 +223,10 @@ export function BottomDrawer() {
                         </svg>
                       </div>
                       <p className="text-foreground font-semibold text-[15px]">
-                        All tests passed!
+                        All constraint checks passed
                       </p>
                       <p className="text-[13px] text-muted mt-1">
-                        Your schema is verified and ready for export.
+                        The database enforces every key, NOT NULL, UNIQUE and CHECK rule in this schema. These checks don&apos;t judge whether the design fits your requirements.
                       </p>
                     </div>
                   </div>

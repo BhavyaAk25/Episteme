@@ -25,17 +25,3 @@ export function SidebarLoadingSkeleton() {
     </div>
   );
 }
-
-export function CanvasLoadingSkeleton() {
-  return (
-    <div className="w-[420px] max-w-[92vw] rounded-xl border border-border bg-surface p-4 shadow-xl">
-      <SkeletonBlock className="h-5 w-44" />
-      <div className="mt-4 space-y-3">
-        <SkeletonBlock className="h-14 w-full" />
-        <SkeletonBlock className="h-14 w-full" />
-        <SkeletonBlock className="h-14 w-full" />
-      </div>
-      <p className="mt-4 text-xs text-muted">Building ontology and ERD...</p>
-    </div>
-  );
-}

@@ -257,6 +257,8 @@ export async function callGemini(
     responseJsonSchema?: unknown;
     temperature?: number;
     useCache?: boolean;
+    /** Instructions kept separate from user-supplied content. */
+    systemInstruction?: string;
   } = {}
 ): Promise<string> {
   const configStatus = getGeminiConfigStatus();
@@ -299,14 +301,16 @@ export async function callGemini(
     responseJsonSchema,
     temperature = operation === "autofix" ? 0.2 : 1.0,
     useCache = operation === "generate",
+    systemInstruction,
   } = options;
+  const cacheKey = systemInstruction ? `${systemInstruction}\u0000${prompt}` : prompt;
 
   const maxRetries = options.maxRetries ?? (
     operation === "autofix" ? DEFAULT_AUTOFIX_MAX_RETRIES : DEFAULT_GENERATE_MAX_RETRIES
   );
 
   if (useCache) {
-    const cached = readCache(prompt);
+    const cached = readCache(cacheKey);
     if (cached) {
       return cached;
     }
@@ -342,6 +346,7 @@ export async function callGemini(
         responseMimeType: string;
         responseSchema?: unknown;
         responseJsonSchema?: unknown;
+        systemInstruction?: string;
       } = {
         temperature,
         topK: 40,
@@ -355,6 +360,9 @@ export async function callGemini(
       }
       if (responseJsonSchema !== undefined) {
         config.responseJsonSchema = responseJsonSchema;
+      }
+      if (systemInstruction) {
+        config.systemInstruction = systemInstruction;
       }
 
       const response = await geminiClient.models.generateContent({
@@ -389,7 +397,7 @@ export async function callGemini(
       }
 
       if (useCache) {
-        writeCache(prompt, text);
+        writeCache(cacheKey, text);
       }
       return text;
     } catch (error) {

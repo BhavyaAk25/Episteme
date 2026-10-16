@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import JSZip from "jszip";
 import { z } from "zod";
+import { escapeHtml } from "@/lib/server/escapeHtml";
 
 const ExportRequestSchema = z.object({
-  schemaSql: z.string().min(1),
+  schemaSql: z.string().min(1).max(200_000),
   ontology: z.unknown(),
-  prompt: z.string().optional(),
+  prompt: z.string().max(4000).optional(),
   simulationResults: z
     .object({
       totalTests: z.number(),
@@ -68,12 +69,12 @@ function generateVerificationReportHtml(data: {
           .map(
             (incident) => `
         <tr>
-          <td>${incident.id}</td>
-          <td>${incident.status}</td>
-          <td>${incident.testResult.testName}</td>
-          <td>${incident.testResult.category}</td>
-          <td>${incident.testResult.error ?? "N/A"}</td>
-          <td>${incident.rootCause ?? "N/A"}</td>
+          <td>${escapeHtml(incident.id)}</td>
+          <td>${escapeHtml(incident.status)}</td>
+          <td>${escapeHtml(incident.testResult.testName)}</td>
+          <td>${escapeHtml(incident.testResult.category)}</td>
+          <td>${escapeHtml(incident.testResult.error ?? "N/A")}</td>
+          <td>${escapeHtml(incident.rootCause ?? "N/A")}</td>
         </tr>`
           )
           .join("")
@@ -102,7 +103,7 @@ function generateVerificationReportHtml(data: {
   <div class="card">
     <h1>Episteme Verification Report</h1>
     <p class="meta">Generated at ${new Date().toISOString()}</p>
-    <p class="meta">Prompt: ${data.prompt ?? "N/A"}</p>
+    <p class="meta">Prompt: ${escapeHtml(data.prompt ?? "N/A")}</p>
   </div>
 
   <div class="card">
@@ -142,7 +143,7 @@ function generateVerificationReportHtml(data: {
 
   <div class="card">
     <h2>Schema Snapshot</h2>
-    <pre>${data.schemaSql.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>
+    <pre>${escapeHtml(data.schemaSql)}</pre>
   </div>
 </body>
 </html>`;

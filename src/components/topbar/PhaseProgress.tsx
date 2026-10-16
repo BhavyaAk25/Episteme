@@ -1,66 +1,84 @@
 "use client";
 
 import { useProjectStore } from "@/store/useProjectStore";
-import type { BuildPhase } from "@/types/gemini";
+import { useSimulationStore } from "@/store/useSimulationStore";
 
-const phases: { key: BuildPhase; label: string }[] = [
-  { key: "plan", label: "Plan" },
-  { key: "ontology", label: "Ontology" },
-  { key: "erd", label: "ERD" },
-  { key: "constraints", label: "Constraints" },
-  { key: "actions", label: "Actions" },
-  { key: "verify", label: "Verify" },
-];
+type StepState = "done" | "active" | "attention" | "pending";
 
+interface Step {
+  label: string;
+  state: StepState;
+}
+
+/**
+ * Real workflow progress, derived from actual app state:
+ * schema generated → tests run → issues fixed.
+ */
 export function PhaseProgress() {
-  const { currentPhase, isGenerating } = useProjectStore();
+  const { erd, isGenerating } = useProjectStore();
+  const { results, isRunning, isFixing } = useSimulationStore();
 
-  if (!currentPhase && !isGenerating) {
+  if (!erd && !isGenerating) {
     return null;
   }
 
-  const currentIndex = phases.findIndex((p) => p.key === currentPhase);
+  const openIssues = (results?.incidents ?? []).filter((incident) => incident.status === "open").length;
+
+  const steps: Step[] = [
+    { label: "Schema", state: isGenerating ? "active" : erd ? "done" : "pending" },
+    {
+      label: "Verify",
+      state: isRunning ? "active" : results ? "done" : "pending",
+    },
+    {
+      label: openIssues > 0 ? `Fix ${openIssues} issue${openIssues === 1 ? "" : "s"}` : "Fix issues",
+      state: isFixing
+        ? "active"
+        : !results
+          ? "pending"
+          : openIssues > 0
+            ? "attention"
+            : "done",
+    },
+  ];
 
   return (
-    <div className="flex items-center">
-      {phases.map((phase, index) => {
-        const isComplete = currentIndex > index;
-        const isCurrent = currentIndex === index;
-
-        return (
-          <div key={phase.key} className="flex items-center">
-            <div className="flex items-center gap-1.5">
-              {/* Dot / checkmark / spinner */}
-              {isComplete ? (
-                <div className="w-4 h-4 rounded-full bg-[#2E7D32] flex items-center justify-center">
-                  <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-              ) : isCurrent && isGenerating ? (
-                <div className="w-3 h-3 rounded-full bg-[#1565C0] animate-pulse" />
-              ) : (
-                <div className="w-2.5 h-2.5 rounded-full bg-[#999]" />
-              )}
-              <span
-                className={`text-[12px] ${
-                  isComplete
-                    ? "text-[#2E7D32]"
-                    : isCurrent
-                    ? "text-[#1565C0] font-semibold"
-                    : "text-[#999]"
-                }`}
-              >
-                {phase.label}
+    <ol className="flex items-center" aria-label="Workflow progress">
+      {steps.map((step, index) => (
+        <li key={step.label} className="flex items-center">
+          <div className="flex items-center gap-1.5">
+            {step.state === "done" ? (
+              <span className="w-4 h-4 rounded-full bg-[#2E7D32] flex items-center justify-center">
+                <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
               </span>
-            </div>
-            {/* Connecting line */}
-            {index < phases.length - 1 && (
-              <div className={`w-6 h-px mx-1 ${isComplete ? "bg-[#2E7D32]" : "bg-[rgba(0,0,0,0.15)]"}`} />
+            ) : step.state === "active" ? (
+              <span className="w-3.5 h-3.5 rounded-full border-2 border-[#1565C0]/30 border-t-[#1565C0] animate-spin" />
+            ) : step.state === "attention" ? (
+              <span className="w-3 h-3 rounded-full bg-warning" />
+            ) : (
+              <span className="w-2.5 h-2.5 rounded-full bg-[#bbb]" />
             )}
+            <span
+              className={`text-[12px] ${
+                step.state === "done"
+                  ? "text-[#2E7D32]"
+                  : step.state === "active"
+                    ? "text-[#1565C0] font-semibold"
+                    : step.state === "attention"
+                      ? "text-warning font-semibold"
+                      : "text-[#999]"
+              }`}
+            >
+              {step.label}
+            </span>
           </div>
-        );
-      })}
-    </div>
+          {index < steps.length - 1 && (
+            <span className={`w-8 h-px mx-2 ${step.state === "done" ? "bg-[#2E7D32]" : "bg-[rgba(0,0,0,0.15)]"}`} />
+          )}
+        </li>
+      ))}
+    </ol>
   );
 }

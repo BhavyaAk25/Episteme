@@ -6,23 +6,27 @@ import { parseGeminiJsonLenient } from "@/lib/gemini/jsonRepair";
 import { AutoFixResponseSchema } from "@/lib/gemini/schemas";
 import type { ERD, Table } from "@/types/erd";
 import type { Patch } from "@/types/simulation";
+import { checkRateLimit, clientKey } from "@/lib/server/rateLimit";
+
+const AUTOFIX_RATE_LIMIT = 10; // requests per window per client
+const AUTOFIX_RATE_WINDOW_MS = 60_000;
 
 const IncidentInputSchema = z.object({
   id: z.string(),
   testResult: z.object({
     testId: z.string(),
-    testName: z.string(),
+    testName: z.string().max(300),
     category: z.enum(["happy_path", "edge_case", "adversarial", "concurrency"]),
     passed: z.boolean(),
-    error: z.string().nullable(),
-    sql: z.string(),
+    error: z.string().max(2000).nullable(),
+    sql: z.string().max(10_000),
     durationMs: z.number(),
   }),
 });
 
 const AutoFixRequestSchema = z.object({
-  schemaSql: z.string().min(1),
-  incidents: z.array(IncidentInputSchema).min(1),
+  schemaSql: z.string().min(1).max(100_000),
+  incidents: z.array(IncidentInputSchema).min(1).max(20),
   erd: z.unknown().optional(),
   maxIncidents: z.number().int().positive().max(20).optional(),
 });
@@ -604,6 +608,14 @@ async function generatePatchWithGemini(
 }
 
 export async function POST(request: Request) {
+  const limit = checkRateLimit(clientKey(request, "autofix"), AUTOFIX_RATE_LIMIT, AUTOFIX_RATE_WINDOW_MS);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Too many auto-fix requests. Please wait a moment and try again.", retryAfterSec: limit.retryAfterSec },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSec) } }
+    );
+  }
+
   try {
     const rawBody = await request.json();
     const parsedBody = AutoFixRequestSchema.safeParse(rawBody);

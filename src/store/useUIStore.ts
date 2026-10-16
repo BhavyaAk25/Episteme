@@ -51,7 +51,7 @@ interface UIState {
 
 const initialState = {
   sidebarOpen: true,
-  sidebarWidth: 292,
+  sidebarWidth: 260,
   inspectorOpen: false,
   inspectorWidth: 320,
   drawerOpen: false,

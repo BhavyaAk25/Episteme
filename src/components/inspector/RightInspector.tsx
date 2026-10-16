@@ -28,17 +28,14 @@ export function RightInspector() {
           style={{ width: inspectorWidth }}
           >
           {/* Header */}
-          <div className="relative p-5 border-b border-border flex items-center">
-            <h2
-              className={`absolute left-1/2 -translate-x-1/2 font-bold text-foreground pointer-events-none ${
-                selectedNode ? "text-[18px]" : "text-[16px] whitespace-nowrap"
-              }`}
-            >
-              {selectedNode ? "Table Details" : "Relationship Details"}
+          <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
+            <h2 className="text-[15px] font-semibold text-foreground">
+              {selectedNode ? "Table" : "Relationship"}
             </h2>
             <button
               onClick={closeInspector}
-              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[rgba(0,0,0,0.05)] transition-colors z-10"
+              aria-label="Close inspector"
+              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[rgba(0,0,0,0.05)] transition-colors"
             >
               <svg
                 className="w-5 h-5 text-muted"
@@ -62,10 +59,10 @@ export function RightInspector() {
               <div>
                 {/* Table name and status */}
                 <div className="mb-4">
-                  <h3 className="text-[16px] font-semibold text-foreground text-center">
+                  <h3 className="text-[16px] font-semibold text-foreground font-mono">
                     {nodeData.tableName}
                   </h3>
-                  <div className="flex items-center justify-center gap-2 mt-2">
+                  <div className="flex items-center gap-2 mt-2">
                     <StatusTag status={nodeData.status} />
                     <ConfidenceBadge confidence={nodeData.confidence} />
                   </div>
@@ -73,21 +70,19 @@ export function RightInspector() {
 
                 {/* Columns */}
                 <div>
-                  <div className="h-8" />
-                  <div className="-mx-5 border-t border-border/70" />
-                  <div className="h-0" />
-                  <h4 className="ui-section-title text-center">
+                  <div className="mt-6 mb-4 -mx-5 border-t border-border/70" />
+                  <h4 className="ui-section-title">
                     Columns ({nodeData.columns.length})
                   </h4>
-                  <div className="mt-5 space-y-2 pb-2">
+                  <div className="mt-3 space-y-1">
                     {nodeData.columns.map((col, idx) => (
                       <div
                         key={col.name}
-                        className={`flex items-center justify-between pl-4 pr-16 py-3 rounded-xl ${
+                        className={`flex items-center justify-between gap-3 px-3 py-2 rounded-lg ${
                           idx % 2 === 0 ? "bg-[rgba(0,0,0,0.02)]" : ""
                         }`}
                       >
-                        <div className="flex flex-1 items-center gap-2 min-w-0 pr-4">
+                        <div className="flex flex-1 items-center gap-2 min-w-0">
                           {col.isPrimaryKey && (
                             <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#FFF8E1] text-[#D4A017]">
                               PK
@@ -102,7 +97,7 @@ export function RightInspector() {
                             {col.name}
                           </span>
                         </div>
-                        <div className="flex items-center justify-end gap-2 min-w-[156px] shrink-0">
+                        <div className="flex items-center justify-end gap-2 shrink-0">
                           <span className="text-[12px] text-[#8B7355] whitespace-nowrap text-right">
                             {col.dataType}
                           </span>
@@ -120,17 +115,15 @@ export function RightInspector() {
                 {/* Constraints */}
                 {nodeData.constraints.length > 0 && (
                   <div>
-                    <div className="h-10" />
-                    <div className="-mx-5 border-t border-border/70" />
-                    <div className="h-0" />
-                    <h4 className="ui-section-title text-center">
+                  <div className="mt-6 mb-4 -mx-5 border-t border-border/70" />
+                    <h4 className="ui-section-title">
                       Constraints ({nodeData.constraints.length})
                     </h4>
-                    <div className="mt-5 space-y-3 pb-2">
+                    <div className="mt-3 space-y-2">
                       {nodeData.constraints.map((constraint, idx) => (
                         <div
                           key={idx}
-                          className="px-4 py-3 rounded-xl text-[13px] bg-[rgba(0,0,0,0.02)] whitespace-normal break-words leading-[1.4]"
+                          className="px-3 py-2 rounded-lg text-[13px] bg-[rgba(0,0,0,0.02)] whitespace-normal break-words leading-[1.4]"
                         >
                           <span
                             className={
@@ -162,17 +155,15 @@ export function RightInspector() {
                 {/* Indexes */}
                 {nodeData.indexes.length > 0 && (
                   <div>
-                    <div className="h-10" />
-                    <div className="-mx-5 border-t border-border/70" />
-                    <div className="h-0" />
-                    <h4 className="ui-section-title text-center">
+                  <div className="mt-6 mb-4 -mx-5 border-t border-border/70" />
+                    <h4 className="ui-section-title">
                       Indexes ({nodeData.indexes.length})
                     </h4>
-                    <div className="mt-5 space-y-3 pb-2">
+                    <div className="mt-3 space-y-2">
                       {nodeData.indexes.map((index) => (
                         <div
                           key={index.name}
-                          className="px-4 py-3 rounded-xl text-[13px] bg-[rgba(0,0,0,0.02)] whitespace-normal break-words leading-[1.4]"
+                          className="px-3 py-2 rounded-lg text-[13px] bg-[rgba(0,0,0,0.02)] whitespace-normal break-words leading-[1.4]"
                         >
                           <span className="text-accent">{index.name}</span>
                           <span className="text-[#8B7355] ml-2">
@@ -192,27 +183,27 @@ export function RightInspector() {
             {edgeData && (
               <div className="space-y-4">
                 <div>
-                  <h3 className="text-[16px] font-mono font-semibold text-foreground text-center break-words">
+                  <h3 className="text-[16px] font-mono font-semibold text-foreground break-words">
                     {edgeData.fromColumn} → {edgeData.toColumn}
                   </h3>
                 </div>
 
                 <div className="space-y-2">
-                  <div className="grid grid-cols-[1fr_auto] items-center pl-6 pr-[56px] py-2.5 rounded-lg bg-[rgba(0,0,0,0.02)]">
+                  <div className="grid grid-cols-[1fr_auto] items-center px-3 py-2.5 rounded-lg bg-[rgba(0,0,0,0.02)]">
                     <span className="min-w-0 truncate text-[13px] text-[#8B7355] pr-3">Cardinality</span>
-                    <span className="justify-self-end mr-2 whitespace-nowrap font-mono text-[13px] text-foreground">
+                    <span className="justify-self-end whitespace-nowrap font-mono text-[13px] text-foreground">
                       {edgeData.cardinality}
                     </span>
                   </div>
-                  <div className="grid grid-cols-[1fr_auto] items-center pl-6 pr-[56px] py-2.5 rounded-lg">
+                  <div className="grid grid-cols-[1fr_auto] items-center px-3 py-2.5 rounded-lg">
                     <span className="min-w-0 truncate text-[13px] text-[#8B7355] pr-3">Required</span>
-                    <span className="justify-self-end mr-2 whitespace-nowrap font-mono text-[13px] text-foreground">
+                    <span className="justify-self-end whitespace-nowrap font-mono text-[13px] text-foreground">
                       {edgeData.required ? "Yes" : "No"}
                     </span>
                   </div>
-                  <div className="grid grid-cols-[1fr_auto] items-center pl-6 pr-[56px] py-2.5 rounded-lg bg-[rgba(0,0,0,0.02)]">
+                  <div className="grid grid-cols-[1fr_auto] items-center px-3 py-2.5 rounded-lg bg-[rgba(0,0,0,0.02)]">
                     <span className="min-w-0 truncate text-[13px] text-[#8B7355] pr-3">On Delete</span>
-                    <span className="justify-self-end mr-2 whitespace-nowrap font-mono text-[13px] text-foreground">
+                    <span className="justify-self-end whitespace-nowrap font-mono text-[13px] text-foreground">
                       {edgeData.onDelete}
                     </span>
                   </div>

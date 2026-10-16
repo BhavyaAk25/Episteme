@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useProjectStore } from "@/store/useProjectStore";
 
 interface TemplateDefinition {
@@ -36,36 +35,33 @@ const templates: TemplateDefinition[] = [
 
 export function TemplateSelector() {
   const { setPrompt, isGenerating, templateId } = useProjectStore();
-  const [selectedTemplateId, setSelectedTemplateId] = useState<TemplateDefinition["id"]>("inventory");
-  const effectiveTemplateId = templateId ?? selectedTemplateId;
 
   const applyTemplate = (template: TemplateDefinition) => {
-    setSelectedTemplateId(template.id);
     setPrompt(template.prompt, template.id as "inventory" | "saas" | "ecommerce");
   };
 
   return (
-    <div className="pt-6 pb-0">
-      <h3 className="ui-section-title mb-6 text-center">Quick Templates</h3>
-      <div className="space-y-5">
+    <div>
+      <h3 className="ui-section-title mb-3">Start from a template</h3>
+      <div className="space-y-2">
         {templates.map((template) => {
-          const isActive = template.id === effectiveTemplateId;
+          const isActive = template.id === templateId;
           return (
             <button
               key={template.id}
               type="button"
               disabled={isGenerating}
               onClick={() => applyTemplate(template)}
-              className={`w-full border rounded-2xl px-6 py-6 min-h-[112px] flex flex-col items-center justify-center text-center gap-2.5 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+              className={`w-full border rounded-lg px-3 py-2.5 flex flex-col items-start text-left gap-0.5 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                 isActive
                   ? "border-[#c4a574] bg-white/80"
                   : "border-border/70 bg-white/55 hover:bg-white/80 hover:border-[#c4a574]"
               }`}
             >
-              <div className={`text-[16px] text-foreground leading-tight ${isActive ? "font-semibold" : "font-medium"}`}>
+              <div className={`text-[13px] text-foreground leading-tight ${isActive ? "font-semibold" : "font-medium"}`}>
                 {template.title}
               </div>
-              <div className="text-[13px] text-muted leading-relaxed max-w-[26ch] mx-auto">
+              <div className="text-[12px] text-muted leading-snug">
                 {template.description}
               </div>
             </button>

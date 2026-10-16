@@ -2,8 +2,26 @@ import type { Node, Edge } from "@xyflow/react";
 import type { ERD, ERDNodeData, ERDEdgeData } from "@/types/erd";
 import type { Ontology } from "@/types/ontology";
 
-const HORIZONTAL_SPACING = 340;
+const HORIZONTAL_SPACING = 400;
 const VERTICAL_SPACING = 210;
+const VERTICAL_GAP = 56;
+
+/**
+ * Rough rendered height of a table node, so the layout can stack tables
+ * without overlapping. Mirrors ERDTableNode: header + column rows +
+ * (optional) constraints footer showing at most 3 rows.
+ */
+export function estimateNodeHeight(table: ERD["tables"][number]): number {
+  const HEADER = 42;
+  const ROW = 27;
+  const BODY_PADDING = 12;
+  const visibleConstraints = Math.min(
+    3,
+    table.constraints.filter((c) => c.type !== "PRIMARY_KEY" && c.type !== "NOT_NULL").length
+  );
+  const footer = visibleConstraints > 0 ? 14 + visibleConstraints * 20 : 0;
+  return HEADER + BODY_PADDING + table.columns.length * ROW + footer;
+}
 
 function buildTableLayers(erd: ERD): string[][] {
   const tableNames = erd.tables.map((table) => table.name);
@@ -117,14 +135,20 @@ export function erdToNodes(erd: ERD, ontology: Ontology): Node<ERDNodeData>[] {
       });
     }
 
-    const layerHeight = (layer.length - 1) * VERTICAL_SPACING;
+    const heights = layer.map((tableName) => {
+      const table = erd.tables.find((t) => t.name === tableName);
+      return table ? estimateNodeHeight(table) : VERTICAL_SPACING;
+    });
+    const layerHeight =
+      heights.reduce((sum, height) => sum + height, 0) + VERTICAL_GAP * Math.max(0, layer.length - 1);
 
+    let cursorY = -layerHeight / 2;
     for (let rowIndex = 0; rowIndex < layer.length; rowIndex += 1) {
       const tableName = layer[rowIndex];
       const x = layerIndex * HORIZONTAL_SPACING;
-      const y = rowIndex * VERTICAL_SPACING - layerHeight / 2;
-      tablePosition.set(tableName, { x, y });
+      tablePosition.set(tableName, { x, y: cursorY });
       rowLookup.set(tableName, rowIndex);
+      cursorY += heights[rowIndex] + VERTICAL_GAP;
     }
   }
 
