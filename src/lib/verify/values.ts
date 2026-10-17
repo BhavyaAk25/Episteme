@@ -98,23 +98,28 @@ export function validLiteral(table: Table, column: Column, row: number): string 
   }
 
   // Text-like
+  const unique = table.constraints.some((c) => c.type === "UNIQUE" && c.columns.includes(column.name)) ||
+    table.indexes.some((i) => i.unique && i.columns.includes(column.name));
   const limit = varcharLimit(column.dataType);
   const fit = (value: string) => quote(limit ? value.slice(0, Math.max(1, limit)) : value);
-  const person = `${FIRST[row % FIRST.length]} ${LAST[(row * 3) % LAST.length]}`;
+  // Cycle through sample names; add the row number once they'd repeat, so
+  // UNIQUE columns never collide (tests insert extra rows at 50, 300+…).
+  const person = `${FIRST[row % FIRST.length]} ${LAST[(row * 3) % LAST.length]}${row >= FIRST.length ? ` ${row}` : ""}`;
   if (/email/.test(name)) return fit(`${person.toLowerCase().replace(" ", ".")}${row}@example.com`);
   if (/phone/.test(name)) return fit(`+1-555-01${String(row).padStart(2, "0")}`);
   if (/url|website|link/.test(name)) return fit(`https://example.com/${table.name}/${row + 1}`);
   if (/slug|username|handle|login/.test(name)) return fit(`${WORDS[row % WORDS.length].toLowerCase()}-${row + 1}`);
   if (/sku|code|number|ref/.test(name)) return fit(`${table.name.slice(0, 3).toUpperCase()}-${1000 + row}`);
-  if (/first_name/.test(name)) return fit(FIRST[row % FIRST.length]);
-  if (/last_name|surname/.test(name)) return fit(LAST[(row * 3) % LAST.length]);
+  const suffix = row >= FIRST.length ? ` ${row}` : "";
+  if (/first_name/.test(name)) return fit(`${FIRST[row % FIRST.length]}${suffix}`);
+  if (/last_name|surname/.test(name)) return fit(`${LAST[(row * 3) % LAST.length]}${suffix}`);
   if (/name|title/.test(name)) return fit(/^(full_)?name$/.test(name) && /user|member|customer|person|guest|patient|employee|attendee|author|student/.test(table.name) ? person : `${WORDS[row % WORDS.length]} ${table.name.replace(/_/g, " ").replace(/s$/, "")} ${row + 1}`);
-  if (/status|state/.test(name)) return fit(["active", "pending", "completed"][row % 3]);
-  if (/currency/.test(name)) return fit("USD");
-  if (/country/.test(name)) return fit(["US", "GB", "IN", "DE"][row % 4]);
-  if (/city/.test(name)) return fit(["Austin", "London", "Pune", "Berlin"][row % 4]);
+  if (/status|state/.test(name)) return fit(`${["active", "pending", "completed"][row % 3]}${row >= 3 && unique ? `_${row}` : ""}`);
+  if (/currency/.test(name)) return fit(unique ? `C${String(row).padStart(2, "0")}` : "USD");
+  if (/country/.test(name)) return fit(`${["US", "GB", "IN", "DE"][row % 4]}${row >= 4 && unique ? row : ""}`);
+  if (/city/.test(name)) return fit(`${["Austin", "London", "Pune", "Berlin"][row % 4]}${row >= 4 && unique ? ` ${row}` : ""}`);
   if (/address|street/.test(name)) return fit(`${100 + row} Market Street`);
-  if (/color|colour/.test(name)) return fit(["red", "green", "blue"][row % 3]);
+  if (/color|colour/.test(name)) return fit(`${["red", "green", "blue"][row % 3]}${row >= 3 && unique ? `_${row}` : ""}`);
   if (/description|notes|comment|body|content|bio|reason/.test(name)) return fit(`Sample ${column.name.replace(/_/g, " ")} ${row + 1}`);
   return fit(`${column.name}_${row + 1}`);
 }
