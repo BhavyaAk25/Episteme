@@ -41,13 +41,13 @@ export function CanvasControls() {
 
   return (
     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
-      <div className="bg-[rgba(255,252,247,0.95)] backdrop-blur-[8px] rounded-xl px-4 py-2 flex items-center gap-3 shadow-md border border-[rgba(0,0,0,0.08)]">
+      <div className="bg-surface/95 backdrop-blur-[8px] rounded-xl px-4 py-2 flex items-center gap-3 shadow-md border border-foreground/[0.08]">
         {/* Play/Pause — 40px circle, warm accent */}
         <button
           onClick={handlePlayPause}
           aria-label={isPlaying ? "Pause replay" : "Replay how this schema is built"}
           title={isPlaying ? "Pause" : "Replay build"}
-          className="w-10 h-10 rounded-full bg-[#B8976A] flex items-center justify-center hover:brightness-90 transition-all shadow-sm"
+          className="w-10 h-10 rounded-full bg-brand flex items-center justify-center hover:brightness-90 transition-all shadow-sm"
         >
           {isPlaying ? (
             <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -73,9 +73,9 @@ export function CanvasControls() {
           onClick={handleRestart}
           title="Restart replay"
           aria-label="Restart replay"
-          className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-[rgba(0,0,0,0.05)] transition-colors"
+          className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-foreground/[0.05] transition-colors"
         >
-          <svg className="w-4 h-4 text-[#8B7355]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -91,9 +91,9 @@ export function CanvasControls() {
           disabled={!active}
           title="Stop replay"
           aria-label="Stop replay"
-          className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-[rgba(0,0,0,0.05)] disabled:opacity-30 transition-colors"
+          className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-foreground/[0.05] disabled:opacity-30 transition-colors"
         >
-          <svg className="w-3.5 h-3.5 text-[#8B7355]" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+          <svg className="w-3.5 h-3.5 text-muted" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
             <rect x="4" y="4" width="12" height="12" rx="2" />
           </svg>
         </button>
@@ -102,15 +102,15 @@ export function CanvasControls() {
         <div className="flex-1 min-w-[210px]">
           <div className="h-2 bg-canvas rounded-full overflow-hidden">
             <div
-              className="h-full bg-[#B8976A] transition-all duration-150"
+              className="h-full bg-brand transition-all duration-150"
               style={{ width: `${progress}%` }}
             />
           </div>
           <div className="flex justify-between mt-1.5">
-            <span className="text-[12px] text-[#8B7355]">
+            <span className="text-[12px] text-muted">
               {active ? `Step ${currentBuildStep} / ${totalSteps}` : "Replay build"}
             </span>
-            <span className="text-[12px] text-[#8B7355]">
+            <span className="text-[12px] text-muted">
               {active ? `${Math.round(progress)}% · editing paused` : `${totalSteps} steps`}
             </span>
           </div>
@@ -118,15 +118,15 @@ export function CanvasControls() {
 
         {/* Speed selector */}
         <div className="flex items-center gap-1">
-          <span className="text-[12px] text-[#8B7355] mr-1">Speed</span>
+          <span className="text-[12px] text-muted mr-1">Speed</span>
           {SPEEDS.map((speed) => (
             <button
               key={speed}
               onClick={() => setPlaybackSpeed(speed)}
               className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
                 playbackSpeed === speed
-                  ? "bg-[rgba(184,151,106,0.15)] text-[#B8976A] font-semibold"
-                  : "text-[#8B7355] hover:bg-[rgba(0,0,0,0.05)]"
+                  ? "bg-brand/15 text-brand font-semibold"
+                  : "text-muted hover:bg-foreground/[0.05]"
               }`}
             >
               {speed}x

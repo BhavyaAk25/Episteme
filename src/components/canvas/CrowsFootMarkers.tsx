@@ -9,8 +9,8 @@
 export type EndKind = "one-mandatory" | "one-optional" | "many-mandatory" | "many-optional";
 
 export const MARKER_COLORS = {
-  default: "#A88A5C",
-  selected: "#2f6eb8",
+  default: "var(--edge)",
+  selected: "var(--edge-selected)",
 } as const;
 
 export function markerId(kind: EndKind, tone: keyof typeof MARKER_COLORS): string {
@@ -18,9 +18,10 @@ export function markerId(kind: EndKind, tone: keyof typeof MARKER_COLORS): strin
 }
 
 function Shape({ kind, color }: { kind: EndKind; color: string }) {
-  const stroke = { stroke: color, strokeWidth: 1.5, fill: "none" } as const;
+  // Colors come from CSS variables, so they're set via style (not attributes).
+  const stroke = { style: { stroke: color, fill: "none" }, strokeWidth: 1.5 } as const;
   const circle = (cx: number) => (
-    <circle cx={cx} cy={10} r={3.5} stroke={color} strokeWidth={1.5} style={{ fill: "var(--bg-canvas)" }} />
+    <circle cx={cx} cy={10} r={3.5} strokeWidth={1.5} style={{ stroke: color, fill: "var(--bg-canvas)" }} />
   );
   const crow = <path d="M13 10 L24 3 M13 10 L24 17 M13 10 L24 10" {...stroke} />;
 
@@ -55,7 +56,7 @@ const KINDS: EndKind[] = ["one-mandatory", "one-optional", "many-mandatory", "ma
 
 export function CrowsFootMarkers() {
   return (
-    <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden="true">
+    <svg id="erd-marker-defs" width="0" height="0" style={{ position: "absolute" }} aria-hidden="true">
       <defs>
         {KINDS.flatMap((kind) =>
           (Object.keys(MARKER_COLORS) as Array<keyof typeof MARKER_COLORS>).map((tone) => (

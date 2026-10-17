@@ -10,12 +10,17 @@ import { GenerationStatus } from "@/components/canvas/GenerationStatus";
 import { RightInspector } from "@/components/inspector/RightInspector";
 import { VerifyPanel } from "@/components/verify/VerifyPanel";
 import { ExportModal } from "@/components/export/ExportModal";
+import { NoticeToast } from "@/components/shared/NoticeToast";
+import { ImportModal } from "@/components/import/ImportModal";
+import { ShortcutsDialog } from "@/components/shared/ShortcutsDialog";
 import { useProjectStore } from "@/store/useProjectStore";
+import { useUIStore } from "@/store/useUIStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
 import { useErdStore } from "@/store/useErdStore";
 import { useSimulationStore } from "@/store/useSimulationStore";
 import { useProjectsStore } from "@/store/useProjectsStore";
 import { layoutErd } from "@/lib/erd/layout";
+import { readShareFromLocation, clearShareFromLocation } from "@/lib/export/share";
 import type { ERD } from "@/types/erd";
 
 function readLegacyErd(): ERD | null {
@@ -65,7 +70,22 @@ export default function Home() {
       }
 
       await Promise.resolve(useProjectsStore.persist.rehydrate());
-      if (!cancelled) await useProjectsStore.getState().init();
+      if (cancelled) return;
+      await useProjectsStore.getState().init();
+
+      // Opened a share link: give the visitor their own editable copy.
+      const shared = readShareFromLocation();
+      if (shared && !cancelled) {
+        clearShareFromLocation();
+        await useProjectsStore.getState().createProjectFrom({
+          name: `Copy of ${shared.name}`,
+          prompt: shared.prompt,
+          erd: shared.erd,
+          positions: shared.positions,
+          versionLabel: "Opened from a share link",
+        });
+        useUIStore.getState().showNotice(`“${shared.name}” was added to your projects as an editable copy.`);
+      }
     });
     return () => {
       cancelled = true;
@@ -142,6 +162,9 @@ export default function Home() {
 
       {/* Export Modal */}
       <ExportModal />
+      <NoticeToast />
+      <ImportModal />
+      <ShortcutsDialog />
 
       {/* Error Modal */}
       <AnimatePresence>

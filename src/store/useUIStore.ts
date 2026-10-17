@@ -13,6 +13,9 @@ interface UIState {
 
   // Bottom drawer
   drawerOpen: boolean;
+  notice: string | null;
+  importOpen: boolean;
+  shortcutsOpen: boolean;
   drawerHeight: number;
 
   // Animation
@@ -33,6 +36,9 @@ interface UIState {
   setInspectorWidth: (width: number) => void;
 
   toggleDrawer: () => void;
+  showNotice: (message: string | null) => void;
+  setImportOpen: (open: boolean) => void;
+  setShortcutsOpen: (open: boolean) => void;
   openDrawer: () => void;
   closeDrawer: () => void;
   setDrawerHeight: (height: number) => void;
@@ -55,6 +61,9 @@ const initialState = {
   inspectorOpen: false,
   inspectorWidth: 380,
   drawerOpen: false,
+  notice: null as string | null,
+  importOpen: false,
+  shortcutsOpen: false,
   drawerHeight: 250,
   playbackSpeed: 1 as PlaybackSpeed,
   exportModalOpen: false,
@@ -74,6 +83,9 @@ export const useUIStore = create<UIState>((set) => ({
   setInspectorWidth: (width) => set({ inspectorWidth: width }),
 
   toggleDrawer: () => set((state) => ({ drawerOpen: !state.drawerOpen })),
+  showNotice: (notice) => set({ notice }),
+  setImportOpen: (importOpen) => set({ importOpen }),
+  setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
   openDrawer: () => set({ drawerOpen: true }),
   closeDrawer: () => set({ drawerOpen: false }),
   setDrawerHeight: (height) => set({ drawerHeight: height }),

@@ -38,7 +38,7 @@ export function RightInspector() {
             <button
               onClick={closeInspector}
               aria-label="Close inspector"
-              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[rgba(0,0,0,0.05)] transition-colors"
+              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-foreground/[0.05] transition-colors"
             >
               <svg className="w-5 h-5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

@@ -1,108 +1,47 @@
-# Architecture — Episteme
+# Architecture
 
-## System Architecture
+Episteme is a Next.js app where almost everything runs in the browser. The server only proxies AI calls.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                          EPISTEME UI                            │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  TOP BAR: [Prompt] [Generate] [Simulate] [Auto-Fix] [Export] │
-│  │  [═══════════ Phase Progress ═══════════]                  │  │
-│  └──────────────────────────────────────────────────────────┘   │
-│  ┌─────────┐ ┌─────────────────────────────┐ ┌──────────────┐  │
-│  │ ONTOLOGY│ │        ERD CANVAS           │ │  INSPECTOR   │  │
-│  │ SIDEBAR │ │        (React Flow)         │ │  PANEL       │  │
-│  └─────────┘ └─────────────────────────────┘ └──────────────┘  │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  SIMULATION DRAWER: ✅ Passed  ❌ Failed  · Incidents      │  │
-│  └──────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                    Next.js API routes
-         ┌────────────────────┼────────────────────┐
-         ▼                    ▼                    ▼
-   /api/generate        /api/autofix          /api/export
-         │                    │                    │
-         ▼                    ▼                    ▼
-  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-  │  Gemini 3    │    │  Gemini 3    │    │  ZIP bundle  │
-  │  Flash       │    │  Flash       │    │  SQL / JSON  │
-  │  structured  │    │  migration   │    │  / report    │
-  │  JSON output │    │  patches     │    │              │
-  └──────────────┘    └──────────────┘    └──────────────┘
-
-  Verification is client-side: sql.js (SQLite WASM) runs deterministic
-  chaos tests in the browser — no verification server round-trip.
-```
-
-## Gemini 3 Integration Points
-
-### 1. Schema generation — structured output
-`/api/generate` sends the user prompt plus an explicit JSON instruction schema and asks Gemini 3 Flash for a **single** structured response containing `plan`, `ontology`, `erd`, and an ordered `build_steps` array. The call sets `responseMimeType: "application/json"`, and the payload is validated with **Zod** before reaching the UI. Malformed or unexpected responses trigger a deterministic local fallback rather than an error.
-
-### 2. Self-healing — AI migration patches
-`/api/autofix` receives failing chaos tests plus the current schema and asks Gemini for a **minimal, targeted migration** (SQLite-compatible `ALTER TABLE` / `CREATE INDEX` / `CREATE TRIGGER`). Each patch is applied in the sql.js sandbox and the failing test is re-run to prove the fix. When Gemini is unavailable, deterministic fallback patches are generated from the SQLite error messages.
-
-### 3. Build animation (client-side)
-The build animation is **not** token streaming. Gemini returns an ordered `build_steps` array once, and the frontend choreographs it locally with `requestAnimationFrame` + Framer Motion. This is more reliable and visually smoother than streaming partial tokens.
-
-### 4. Deterministic client-side verification
-Chaos tests are derived from the ERD's own constraints (UNIQUE / NOT NULL / FOREIGN KEY / CHECK) — not from the LLM — and executed in the browser via sql.js. This keeps verification fast, free, and reproducible across runs.
-
-### 5. Quota resilience
-The Gemini client normalizes provider errors, detects `429` / `RESOURCE_EXHAUSTED`, applies a short local cooldown window, and exposes quota metadata so both routes can fall back to local generation/patching without hard-failing.
-
-## Data Flow
+## Data flow
 
 ```
-User Prompt
-    │
-    ▼
-/api/generate ──► Gemini 3 structured output
-    │                { plan, ontology, erd, build_steps }
-    │                     │ validated with Zod
-    ▼                     ▼
-Zustand stores ◄── plan · ontology · ERD · build script
-    │
-    ▼
-CANVAS ANIMATION ── React Flow renders the build script step-by-step
-    │
-    ▼
-SIMULATE (client) ── sql.js seeds data + runs deterministic chaos tests
-    │
-    ├── all pass ──► EXPORT (schema.sql, ontology.json, report.html)
-    │
-    └── failures ──► /api/autofix
-                          │
-                          ▼
-                     Gemini 3 proposes migration patches
-                          │
-                          ▼
-                     apply in sandbox → re-run failing tests
-                          │
-                          ▼
-                     show before/after diff + proof
+              ┌────────────── useErdStore (zustand + zundo) ──────────────┐
+              │  erd: tables + relationships   positions   undo/redo     │
+              └──────┬──────────────┬───────────────┬──────────────┬─────┘
+                     │              │               │              │
+              ERD canvas      erdToSql()      verify/runner    export/*
+           (React Flow,       PostgreSQL      (PGlite tests)   MySQL · SQLite ·
+            crow's feet)      DDL                              Prisma · Drizzle ·
+                                                               PNG/SVG · share link
 ```
 
-## Palantir-Inspired Ontology Model
+- **`src/lib/erd/model.ts`**: pure, validated edit operations (add/rename/delete tables and columns, foreign keys, constraints, indexes). `normalizeErd` keeps the invariants: relationships own foreign keys, "required" mirrors NOT NULL, and nothing references a missing table or column.
+- **`src/lib/erd/applyOps.ts`**: applies a list of edit operations (from the AI, the linter's fixes, or tests) through the model functions, reporting each result.
+- **`src/store/useErdStore.ts`**: the single source of truth, with undo history (zundo) and localStorage persistence of the working copy.
+- **`src/store/useProjectsStore.ts`** + **`src/lib/storage/idb.ts`**: projects and version history in IndexedDB.
 
-| Palantir Concept | Episteme Equivalent | Purpose |
-|-----------------|---------------------|---------|
-| Object Type | Entity in ontology sidebar | Real-world entity definition |
-| Property | Column in ERD table | Entity characteristic |
-| Link Type | Relationship edge on canvas | Semantic connection |
-| Action Type | Action in action catalog | First-class operation with preconditions |
-| Interface | Shared behavior set | Common properties across entities (Auditable) |
+## AI
 
-## Technology Choices
+- **`/api/generate`**: one call produces plan, ontology and ERD as JSON. With `stream: true` the route streams NDJSON `progress` events (phase plus table names parsed from the partial JSON), then a `result` or `error`. Output is validated with forgiving Zod schemas (`src/lib/gemini/schemas.ts`) and normalised (`src/lib/generation/server.ts`). If the AI fails, the route returns an honest error, or the built-in template the user picked; never a guessed schema.
+- **`/api/edit`**: given a compact text form of the schema and a request, returns edit operations for the preview/apply flow.
+- **`src/lib/ai/provider.ts`**: Gemini by default (`@google/genai`, `thinkingLevel: low`), or any OpenAI-compatible free backend (Groq, OpenRouter, Ollama) via `AI_PROVIDER`.
+- Both routes are rate-limited per client (`src/lib/server/rateLimit.ts`) and size-limited. User text is delimited and kept out of the system instructions.
 
-| Choice | Reasoning |
-|--------|-----------|
-| Next.js App Router | Vercel-native deployment; server-side API routes keep the Gemini key off the client |
-| React Flow (@xyflow/react) | MIT-licensed, proven for node-based ERD UIs, custom nodes/edges |
-| sql.js (SQLite WASM) | Browser-native database sandbox — instant, free schema testing with no server |
-| Zustand | Minimal state management that integrates naturally with React Flow, with `persist` for session restore |
-| Framer Motion | Production-grade animation for build-playback choreography |
-| Zod | TypeScript-native validation, directly compatible with Gemini's structured JSON |
-| Tailwind CSS | Rapid, consistent theming |
-| Vitest | Fast unit tests for the deterministic generation/verification core |
+## Verification (`src/lib/verify`)
+
+- **`runner.ts`**: starts a fresh PGlite instance, runs `erdToSql` statement by statement, and seeds realistic rows parents-first (`values.ts`). It then tests NOT NULL, UNIQUE, FK and CHECK by expected SQLSTATE, each inside a savepoint. ON DELETE behaviour is tested with a fresh parent and child per relationship.
+- **`linter.ts`**: design rules with explanations and fixes expressed as edit operations.
+- **`coverage.ts`**: entities named in the prompt that no table or column matches.
+- **`useIssues.ts`**: merges linter, coverage, SQL errors and failed tests; applies fixes or sends issues to "Ask AI to change".
+
+## Import (`src/lib/import/fromSql.ts`)
+
+Runs pasted DDL in PGlite (with a light MySQL→Postgres adaptation as a fallback), then reads `pg_class`, `pg_attribute`, `pg_constraint` and `pg_index` back into an ERD.
+
+## UI
+
+- `components/canvas`: React Flow canvas, table nodes with per-column handles, crow's-foot edges, toolbar, AI edit bar, replay controls, generation status.
+- `components/inspector`: table and relationship editors.
+- `components/verify/VerifyPanel.tsx`: issues, Postgres tests and sample data.
+- `components/export`, `components/import`, `components/projects`, `components/shared`: dialogs, project switcher, history, theme toggle, shortcuts and notices.
+- Themes: CSS variables in `app/globals.css`, with light/dark by system preference or the toggle.

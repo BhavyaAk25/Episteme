@@ -33,7 +33,7 @@ export function HistoryPanel({ onClose }: { onClose: () => void }) {
       ) : (
         <ul className="max-h-[320px] overflow-y-auto py-1">
           {versions.map((version, index) => (
-            <li key={version.id} className="group px-3 py-2 flex items-start justify-between gap-3 hover:bg-[rgba(0,0,0,0.03)]">
+            <li key={version.id} className="group px-3 py-2 flex items-start justify-between gap-3 hover:bg-foreground/[0.03]">
               <span className="min-w-0">
                 <span className="block text-[12px] text-foreground leading-snug break-words">{version.label}</span>
                 <span className="block text-[11px] text-muted">
@@ -43,7 +43,7 @@ export function HistoryPanel({ onClose }: { onClose: () => void }) {
               </span>
               <button
                 onClick={() => void restoreVersion(version.id)}
-                className="shrink-0 h-7 px-2.5 rounded-md border border-border text-[11px] font-medium text-foreground opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-white transition-opacity"
+                className="shrink-0 h-7 px-2.5 rounded-md border border-border text-[11px] font-medium text-foreground opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-elevated transition-opacity"
               >
                 Restore
               </button>

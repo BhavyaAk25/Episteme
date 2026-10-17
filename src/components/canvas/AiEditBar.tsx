@@ -64,8 +64,8 @@ export function AiEditBar() {
         <div className="px-4 py-2.5 border-t border-border flex items-center justify-between gap-3">
           <span className="text-[11px] text-muted">
             {applied} change{applied === 1 ? "" : "s"}
-            {failed > 0 ? ` · ${failed} skipped` : ""} · <span className="text-[#2E7D32]">green = new</span>,{" "}
-            <span className="text-[#C77D0A]">amber = changed</span>
+            {failed > 0 ? ` · ${failed} skipped` : ""} · <span className="text-success">green = new</span>,{" "}
+            <span className="text-warning">amber = changed</span>
           </span>
           <div className="flex gap-2">
             <button onClick={discard} className="ui-ghost-btn !min-h-8 !py-1 !px-3">
@@ -115,7 +115,7 @@ export function AiEditBar() {
         <button
           type="submit"
           disabled={loading || !draft.trim()}
-          className="h-8 px-3.5 rounded-full bg-[#B8976A] text-white text-[12px] font-semibold disabled:opacity-40 flex items-center gap-1.5"
+          className="h-8 px-3.5 rounded-full bg-brand text-white text-[12px] font-semibold disabled:opacity-40 flex items-center gap-1.5"
         >
           {loading ? (
             <>

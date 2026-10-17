@@ -1,239 +1,121 @@
-# Episteme — AI-Powered Database Schema Builder
+# Episteme
 
-> Turn plain-English requirements into verified, production-grade database systems. Powered by Gemini 3.
+**Design a database from plain English, then edit it, test it in real Postgres, and export it.**
 
-**[Live Demo](https://episteme-one.vercel.app)** · [Architecture](./ARCHITECTURE.md) · [Gemini Prompts](./GEMINI_PROMPTS.md)
+**[Open the app →](https://episteme-erd.vercel.app)** · free · no account · your work stays in your browser
 
----
-
-## What It Does
-
-Episteme transforms a natural-language description into a complete database system — not just a diagram. Type _"build an inventory management system for a sneaker brand"_ and Gemini 3 constructs an ontology, generates tables and relationships, and lays out an interactive ERD with a live build animation. You can then **stress-test the schema** with adversarial chaos tests that run in an in-browser SQLite sandbox, let Gemini **auto-heal** the failures with verified migration patches, and **export** the whole thing as a bundle.
-
-**This is not a chat interface.** Gemini 3 is embedded as the engine of a real tool.
+Describe your system, for example _"event ticketing with venues, events, ticket tiers, orders and attendees"_, and Episteme drafts a schema as an editable ER diagram. You refine it by hand or by asking the AI for changes. Then you check it in a real Postgres database running in your browser and export it as PostgreSQL, MySQL, SQLite, Prisma or Drizzle.
 
 ---
 
-## Key Features
+## What you can do
 
-- **AI schema generation** — one structured Gemini 3 call turns a prompt into a full plan → ontology → ERD → build script, validated end-to-end with Zod.
-- **Live generation progress** — the AI's answer streams in, so you see real phases and each table name as it's designed.
-- **Ask AI to change…** — describe a change ("add reviews with a 1–5 rating"). The AI proposes small, validated edit operations; you preview them on the canvas (new tables green, changed amber) and apply or discard. Applying is one undoable step.
-- **Projects & version history** — keep several schemas, rename/delete them, and restore earlier versions. Versions are saved on every generation, AI change, and on demand. Everything is stored in your browser (IndexedDB), no account needed.
-- **Free AI providers** — Gemini free tier by default; Groq, OpenRouter free models or a local Ollama work through `AI_PROVIDER`.
-- **Build replay** — watch the current schema assemble step by step. The replay is a view, so it never changes your edits.
-- **Palantir-inspired ontology** — object types, link types, and action types with preconditions, transaction plans, and side effects.
-- **Chaos testing** — automated adversarial tests (duplicate keys, NULL violations, orphaned foreign keys, CHECK violations) executed in an in-browser SQLite sandbox — no server required.
-- **Self-healing schema** — failed tests are sent back to Gemini, which proposes minimal migration patches that are applied in the sandbox and re-run for proof.
-- **Real ERD editor** — add, rename and delete tables and columns; set types, PK, NOT NULL, UNIQUE and defaults; add CHECK constraints and indexes; drag from a column to another table's key to create a foreign key. Full undo/redo (⌘Z / ⌘⇧Z).
-- **Crow's-foot notation** — relationships connect column to column and show optionality (o) and cardinality (| / crow's foot). Tidy up re-lays out the diagram with ELK.
-- **One source of truth** — the diagram, generated SQL, simulation and export all come from the same ERD, so they always match.
-- **Session persistence** — your schema and layout are saved to `localStorage`, so a refresh doesn't lose your work.
-- **One-click export** — SQL schema, ontology JSON, and an HTML verification report as a downloadable ZIP.
-- **Honest failure handling** — if the AI can't generate a schema, you get a clear error with Retry and "Use a template", never an unrelated schema. Built-in templates (Inventory, SaaS, E-Commerce) work without the AI.
-- **Abuse protection** — per-client rate limits and input size limits on the AI routes, with no paid services required.
+### Start
+- **Describe it**: the AI writes the schema while you watch. Progress is streamed live, so you see each phase and each table name as it's designed.
+- **Start from a template**: inventory, SaaS or e-commerce, editable like anything else.
+- **Import SQL**: paste `CREATE TABLE` statements or upload a dump (`pg_dump --schema-only`; simple MySQL dumps work too). Episteme runs it in Postgres and reads the real catalog back, so types, defaults, CHECKs, indexes and every `ON DELETE` rule come through exactly.
+- **Blank canvas**: build it yourself.
 
----
+### Edit
+- **A real ERD editor**: add, rename and delete tables and columns. Set types, primary key, NOT NULL, UNIQUE and defaults, and reorder columns. Add CHECK constraints and indexes.
+- **Draw foreign keys**: drag from a column to another table's key. A correctly typed `<table>_id` column is created when needed. Set 1:1 or 1:N, required, and ON DELETE in plain language.
+- **Crow's-foot notation**: lines connect column to column and show optionality and cardinality. **Tidy up** re-lays out the diagram (ELK).
+- **Undo/redo everything** (⌘Z / ⌘⇧Z). Names are validated (snake_case, no reserved words), and renames update every reference.
+- **Ask AI to change…**: "add product reviews with a 1–5 rating". The AI proposes small edit operations, applied with the same validation as manual edits. You preview them on the canvas (new tables green, changed tables amber), then apply or discard.
 
-## Tech Stack
+### Verify
+- **Run tests in real Postgres**: PGlite (Postgres compiled to WebAssembly) runs the exact exported SQL in your browser and inserts realistic sample rows. It then checks that every NOT NULL, UNIQUE, foreign key, CHECK and ON DELETE (CASCADE / SET NULL / RESTRICT) rule actually holds.
+- **Design checks with one-click fixes**:
+  - missing primary keys
+  - foreign keys without indexes
+  - FK type mismatches
+  - money stored as floats
+  - emails, slugs or SKUs that aren't unique
+  - nullable booleans
+  - repeating groups
+  - duplicate links in junction tables
+  - circular required references
+  - missing timestamps
 
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| Framework | Next.js 16 (App Router) | SSR, API routes, Vercel-native deployment |
-| AI Engine | Gemini 3 Flash (`@google/genai` SDK) | Structured JSON outputs |
-| Canvas | React Flow (`@xyflow/react` v12) | Interactive ERD with custom nodes/edges |
-| State | Zustand | Lightweight state management + persistence |
-| DB Sandbox | sql.js (SQLite WASM) | In-browser schema testing, no server needed |
-| Validation | Zod | Type-safe structured-output schemas |
-| Animation | Framer Motion | Build-playback choreography |
-| Styling | Tailwind CSS v4 | Warm, editorial light theme |
-| Testing | Vitest | Unit tests for the core generation/verification logic |
-| Deployment | Vercel (free tier) | Zero-config HTTPS deployment |
+  Issues without a safe automatic fix get **Ask AI to fix**.
+- **Prompt coverage**: flags things you mentioned that no table stores.
 
-All technologies are free and open source. No paid APIs or hosting required.
-
----
-
-## How Gemini 3 Is Used
-
-Episteme uses Gemini 3 Flash at two points in the pipeline, both server-side (the API key is never exposed to the browser):
-
-### 1. Schema generation — structured output
-A single call to `/api/generate` sends the user's prompt plus a detailed instruction schema and asks Gemini to return **one JSON document** containing the plan, ontology, and ERD. The response uses `responseMimeType: "application/json"` and is validated with Zod before it ever reaches the UI. The build-animation script is then derived deterministically from that ERD. If Gemini returns malformed or unexpected JSON, the route falls back to a deterministic local generator instead of failing.
-
-### 2. Self-healing — AI migration patches
-When a chaos test fails, `/api/autofix` sends Gemini the failing test, the error, and the current schema, and asks for a **minimal, targeted migration** (an `ALTER TABLE`, `CREATE INDEX`, or `CREATE TRIGGER` — the sandbox is SQLite-compatible). Each patch is applied in the sql.js sandbox and the failing test is re-run to **prove** the fix before it's accepted.
-
-### Verification is deterministic and client-side
-Chaos tests are **not** generated by the LLM — they're derived deterministically from the ERD's constraints and executed locally in sql.js. This keeps verification fast, free, and reproducible.
-
-### Failure handling
-The Gemini client tracks quota/rate-limit responses (`429` / `RESOURCE_EXHAUSTED`) and applies a short local cooldown. If generation fails, the app says so and keeps your current schema; it only shows a built-in template when you picked one. Auto-fix falls back to local rule-based patches.
+### Keep and share
+- **Projects and version history**: several projects, autosaved. Versions are recorded on every generation, AI change and restore, and on demand. Restoring can be undone.
+- **Export**:
+  - PostgreSQL, MySQL 8, SQLite, Prisma, Drizzle ORM, ontology JSON and an HTML checks report, as a .zip
+  - the diagram as PNG or SVG
+- **Share link**: the whole schema is packed into the link itself, so nothing is uploaded. Whoever opens it gets their own editable copy.
+- **Light and dark themes**, plus keyboard shortcuts (press `?`).
 
 ---
 
-## Architecture
+## How it works
 
-```mermaid
-flowchart TB
-    User(["🧑 User types a plain-English prompt"]):::user
-
-    subgraph Browser["Browser · Next.js UI — React Flow · Zustand · Framer Motion"]
-        direction TB
-        UI["Top bar &nbsp;·&nbsp; Ontology sidebar &nbsp;·&nbsp; ERD canvas + build animation &nbsp;·&nbsp; Inspector &nbsp;·&nbsp; Simulation drawer"]
-        Sandbox[["sql.js sandbox — SQLite WASM<br/>deterministic chaos tests, in-browser"]]
-    end
-
-    subgraph Server["Next.js API routes · server-side — API key never reaches the client"]
-        direction LR
-        Generate["/api/generate"]
-        Autofix["/api/autofix"]
-        Export["/api/export"]
-    end
-
-    Gemini["✦ Gemini 3 Flash<br/>structured JSON output"]:::ai
-    Fallback{{"Built-in template<br/>(only if picked)"}}:::fb
-    Zip[["schema.sql · ontology.json<br/>verification_report.html"]]
-
-    User --> UI
-    UI -- "Generate" --> Generate
-    UI -- "Auto-Fix" --> Autofix
-    UI -- "Simulate" --> Sandbox
-    UI -- "Export" --> Export
-
-    Generate --> Gemini
-    Generate -. "quota / error" .-> Fallback
-    Gemini -- "plan · ontology · ERD<br/>(Zod-validated)" --> UI
-    Fallback --> UI
-
-    Autofix --> Gemini
-    Gemini -- "migration patch" --> Sandbox
-    Sandbox -- "re-run failing test = proof" --> UI
-
-    Export --> Zip
-    Zip --> User
-
-    classDef ai fill:#B8976A,stroke:#7c6642,color:#ffffff;
-    classDef user fill:#f0e1cc,stroke:#8B7355,color:#3D3425;
-    classDef fb fill:#fff3e0,stroke:#e0a96d,color:#7a5a2e;
+```
+Browser (Next.js · React Flow · Zustand)
+├─ ERD store (single source of truth, undo/redo) ──► diagram, SQL, tests, exports
+├─ PGlite: Postgres in WASM for tests and SQL import (loaded on demand)
+├─ IndexedDB: projects and version history
+└─ calls ──► /api/generate  (streams NDJSON progress, then the schema)
+             /api/edit      (returns edit operations for "Ask AI to change")
+                  │
+                  └─ AI provider: Gemini (default) or Groq / OpenRouter / Ollama
 ```
 
-**In one line:** the browser calls three server routes — `/api/generate` (Gemini structured output; built-in templates when one is picked), `/api/autofix` (Gemini migration patches), and `/api/export` (ZIP bundle) — while all **verification runs in the browser** via a sql.js SQLite sandbox. See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full data flow.
+- **The ERD is the single source of truth.** Foreign-key flags and constraints are derived from relationships, so the diagram, SQL and every export always agree.
+- **AI output is never trusted directly.** Generation is parsed with forgiving Zod schemas; one bad field doesn't sink the result. Edits are applied through validated model functions, one operation at a time.
+- **Honest failures.** If the AI is unavailable or out of quota you get a clear message and your current schema stays. Templates and every non-AI feature keep working.
+- **Free to run.** Gemini's free tier by default; PGlite, IndexedDB and share links need no server or database. AI routes are rate-limited per client and size-limited.
+
+More detail: [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ---
 
-## Ontology Model
+## Run it locally
 
-Inspired by [Palantir Foundry's Ontology](https://www.palantir.com/platforms/foundry/):
-
-| Concept | Description |
-|---------|-------------|
-| **Object Types** | Real-world entities mapped to database tables |
-| **Link Types** | Semantic relationships with explicit cardinalities |
-| **Action Types** | First-class operations with preconditions, transaction plans, and side effects |
-| **Interfaces** | Shared behaviors across entities (Auditable, Transferable, Addressable) |
-
----
-
-## Local Development
-
-### Prerequisites
-- Node.js 18.18+
-- npm
-
-### Setup
+Requirements: Node.js 18.18+ and npm.
 
 ```bash
 git clone https://github.com/BhavyaAk25/Episteme.git
 cd Episteme
 npm install
-cp .env.example .env.local   # then add your Gemini API key
+cp .env.example .env.local   # add a free Gemini key from https://aistudio.google.com/apikey
+npm run dev                  # http://localhost:3000
 ```
 
-### Environment Variables
+Without a key, everything except AI generation and AI edits works.
 
-`.env.local`:
+### Configuration (`.env.local`)
 
-```
-GEMINI_API_KEY=your_gemini_api_key_here
-GEMINI_MODEL=gemini-3-flash-preview
-```
+| Variable | Default | Purpose |
+|---|---|---|
+| `GEMINI_API_KEY` | — | Gemini API key (free tier works) |
+| `GEMINI_MODEL` | `gemini-3-flash-preview` | Model id (comma-separated list = fallbacks) |
+| `GEMINI_THINKING_LEVEL` | `low` | `minimal` / `low` / `medium` / `high` / `off` |
+| `GEMINI_GENERATE_MAX_OUTPUT_TOKENS` | `16384` | Output budget for generation |
+| `AI_PROVIDER` | `gemini` | `groq`, `openrouter` or `ollama` for other free backends |
+| `AI_API_KEY` / `AI_MODEL` / `AI_BASE_URL` | per provider | Settings for those backends |
 
-Get a free key at [Google AI Studio](https://aistudio.google.com/apikey). `GEMINI_MODEL` is optional (defaults to `gemini-3-flash-preview`) but recommended in production so deployments stay explicit and reproducible. Without a key, AI generation shows an error, but the built-in templates, simulation and export still work.
-
-### Run
+### Scripts
 
 ```bash
-npm run dev        # start the dev server at http://localhost:3000
+npm run dev        # development server
+npm run build      # production build
 npm run lint       # eslint
 npm run typecheck  # tsc --noEmit
-npm test           # vitest unit tests
-npm run build      # production build
+npm test           # vitest
 ```
+
+### Deploy
+
+Import the repo on [Vercel](https://vercel.com/new) and set `GEMINI_API_KEY`. Pushes to `main` deploy automatically.
 
 ---
 
-## Testing
+## Tech
 
-Core generation and verification logic is covered by [Vitest](https://vitest.dev) unit tests:
-
-- `src/lib/ontology/transformer.test.ts` — ERD → SQL / nodes / edges
-- `src/lib/simulation/sqlGenerator.test.ts` — PostgreSQL → SQLite schema generation
-- `src/lib/simulation/chaosTests.test.ts` — deterministic adversarial test generation
-- `src/lib/gemini/fallbackGeneration.test.ts` — domain classifier, fallback integrity, and the replay-script contract
-
-```bash
-npm test
-```
-
----
-
-## Deployment
-
-Standard Next.js — deploy to Vercel:
-
-1. Import the GitHub repo at [vercel.com/new](https://vercel.com/new).
-2. Set environment variables: `GEMINI_API_KEY` (required), `GEMINI_MODEL` (recommended).
-3. Deploy — Vercel auto-detects Next.js.
-
-The `sql-wasm.js` and `sql-wasm.wasm` files in `public/` are served as static assets automatically. If Gemini is unavailable or rate-limited, `/api/generate` returns a clear `503` error (or the built-in template, if the user picked one) rather than a guessed schema.
-
----
-
-## Project Structure
-
-```
-episteme/
-├── src/
-│   ├── app/
-│   │   ├── page.tsx            # Main application page
-│   │   ├── layout.tsx          # Root layout
-│   │   ├── globals.css         # Global styles + Tailwind
-│   │   └── api/
-│   │       ├── generate/       # Gemini schema generation (+ built-in templates)
-│   │       ├── autofix/        # Gemini self-healing patches
-│   │       └── export/         # Export bundle (ZIP)
-│   ├── components/
-│   │   ├── canvas/             # ERD visualization + build animation (React Flow)
-│   │   ├── sidebar/            # Ontology explorer + templates
-│   │   ├── inspector/          # Entity detail panel
-│   │   ├── topbar/             # Controls, prompt input, phase progress
-│   │   ├── simulation/         # Chaos-test drawer, incidents, patch diffs
-│   │   ├── export/             # Export modal
-│   │   └── shared/             # Status tags, loading states
-│   ├── lib/
-│   │   ├── gemini/             # Client, prompts, Zod schemas, built-in templates
-│   │   ├── ontology/           # ERD ↔ React Flow + SQL transformers
-│   │   └── simulation/         # sql.js sandbox, seeding, chaos tests, auto-fix
-│   ├── store/                  # Zustand stores (project, canvas, simulation, UI)
-│   └── types/                  # Shared TypeScript types
-├── public/                     # Brand assets + sql.js WASM runtime
-├── ARCHITECTURE.md             # System architecture
-├── GEMINI_PROMPTS.md           # All Gemini system prompts
-└── README.md
-```
-
----
+Next.js 16 · React 19 · React Flow (`@xyflow/react`) · Zustand + zundo · PGlite · ELK.js · Zod · Tailwind CSS v4 · Framer Motion · html-to-image · JSZip · lz-string · Gemini (`@google/genai`). All free and open source.
 
 ## License
 
