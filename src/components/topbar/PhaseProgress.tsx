@@ -2,6 +2,7 @@
 
 import { useProjectStore } from "@/store/useProjectStore";
 import { useSimulationStore } from "@/store/useSimulationStore";
+import { useErdStore } from "@/store/useErdStore";
 
 type StepState = "done" | "active" | "attention" | "pending";
 
@@ -15,7 +16,8 @@ interface Step {
  * schema generated → tests run → issues fixed.
  */
 export function PhaseProgress() {
-  const { erd, isGenerating } = useProjectStore();
+  const isGenerating = useProjectStore((state) => state.isGenerating);
+  const erd = useErdStore((state) => ((state.erd?.tables.length ?? 0) > 0 ? state.erd : null));
   const { results, isRunning, isFixing } = useSimulationStore();
 
   if (!erd && !isGenerating) {

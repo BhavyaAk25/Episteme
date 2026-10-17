@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useSimulationStore } from "@/store/useSimulationStore";
 import { useUIStore } from "@/store/useUIStore";
+import { useErdStore } from "@/store/useErdStore";
 import { PhaseProgress } from "./PhaseProgress";
 import { generateSchema } from "@/lib/actions/generateSchema";
 import { MAX_PROMPT_LENGTH } from "@/lib/limits";
@@ -31,12 +32,12 @@ export function TopBar() {
     prompt,
     setPrompt,
     isGenerating,
-    erd,
     generationMode,
     fallbackDomain,
     generationWarning,
     templateId,
   } = useProjectStore();
+  const erd = useErdStore((state) => ((state.erd?.tables.length ?? 0) > 0 ? state.erd : null));
   const { isRunning: isSimulating, isFixing, results } = useSimulationStore();
   const { openExportModal } = useUIStore();
   const hasOpenIncidents = (results?.incidents ?? []).some((incident) => incident.status === "open");

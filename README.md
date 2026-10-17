@@ -17,12 +17,14 @@ Episteme transforms a natural-language description into a complete database syst
 ## Key Features
 
 - **AI schema generation** — one structured Gemini 3 call turns a prompt into a full plan → ontology → ERD → build script, validated end-to-end with Zod.
-- **Live build animation** — watch tables, columns, and relationships assemble on a Lucidchart-style canvas, choreographed client-side from Gemini's build script.
+- **Build replay** — watch the current schema assemble step by step. The replay is a view, so it never changes your edits.
 - **Palantir-inspired ontology** — object types, link types, and action types with preconditions, transaction plans, and side effects.
 - **Chaos testing** — automated adversarial tests (duplicate keys, NULL violations, orphaned foreign keys, CHECK violations) executed in an in-browser SQLite sandbox — no server required.
 - **Self-healing schema** — failed tests are sent back to Gemini, which proposes minimal migration patches that are applied in the sandbox and re-run for proof.
-- **Interactive ERD canvas** — drag, zoom, pan, select, inspect, and draw your own relationships with React Flow.
-- **Session persistence** — your generated schema is saved to `localStorage`, so a refresh doesn't lose your work.
+- **Real ERD editor** — add, rename and delete tables and columns; set types, PK, NOT NULL, UNIQUE and defaults; add CHECK constraints and indexes; drag from a column to another table's key to create a foreign key. Full undo/redo (⌘Z / ⌘⇧Z).
+- **Crow's-foot notation** — relationships connect column to column and show optionality (o) and cardinality (| / crow's foot). Tidy up re-lays out the diagram with ELK.
+- **One source of truth** — the diagram, generated SQL, simulation and export all come from the same ERD, so they always match.
+- **Session persistence** — your schema and layout are saved to `localStorage`, so a refresh doesn't lose your work.
 - **One-click export** — SQL schema, ontology JSON, and an HTML verification report as a downloadable ZIP.
 - **Honest failure handling** — if the AI can't generate a schema, you get a clear error with Retry and "Use a template", never an unrelated schema. Built-in templates (Inventory, SaaS, E-Commerce) work without the AI.
 - **Abuse protection** — per-client rate limits and input size limits on the AI routes, with no paid services required.

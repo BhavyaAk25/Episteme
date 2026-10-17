@@ -99,10 +99,8 @@ function buildForeignKeyDependencyMap(erd: ERD): Map<string, string[]> {
   return dependencyMap;
 }
 
-/**
- * Transform ERD to React Flow nodes
- */
-export function erdToNodes(erd: ERD, ontology: Ontology): Node<ERDNodeData>[] {
+/** Simple layered layout used when a table has no saved position. */
+function layeredPositions(erd: ERD): Map<string, { x: number; y: number }> {
   const layers = buildTableLayers(erd);
   const dependencyLookup = buildForeignKeyDependencyMap(erd);
   const tablePosition = new Map<string, { x: number; y: number }>();
@@ -112,26 +110,16 @@ export function erdToNodes(erd: ERD, ontology: Ontology): Node<ERDNodeData>[] {
     const layer = [...layers[layerIndex]];
 
     if (layerIndex > 0) {
-      layer.sort((tableA, tableB) => {
-        const dependenciesA = dependencyLookup.get(tableA) ?? [];
-        const dependenciesB = dependencyLookup.get(tableB) ?? [];
-
-        const averageRowA =
-          dependenciesA.length > 0
-            ? dependenciesA.reduce((sum, dependency) => sum + (rowLookup.get(dependency) ?? 0), 0) /
-              dependenciesA.length
-            : Number.POSITIVE_INFINITY;
-        const averageRowB =
-          dependenciesB.length > 0
-            ? dependenciesB.reduce((sum, dependency) => sum + (rowLookup.get(dependency) ?? 0), 0) /
-              dependenciesB.length
-            : Number.POSITIVE_INFINITY;
-
-        if (averageRowA === averageRowB) {
-          return tableA.localeCompare(tableB);
-        }
-
-        return averageRowA - averageRowB;
+      const averageRow = (table: string) => {
+        const deps = dependencyLookup.get(table) ?? [];
+        return deps.length > 0
+          ? deps.reduce((sum, dep) => sum + (rowLookup.get(dep) ?? 0), 0) / deps.length
+          : Number.POSITIVE_INFINITY;
+      };
+      layer.sort((a, b) => {
+        const rowA = averageRow(a);
+        const rowB = averageRow(b);
+        return rowA === rowB ? a.localeCompare(b) : rowA - rowB;
       });
     }
 
@@ -145,22 +133,56 @@ export function erdToNodes(erd: ERD, ontology: Ontology): Node<ERDNodeData>[] {
     let cursorY = -layerHeight / 2;
     for (let rowIndex = 0; rowIndex < layer.length; rowIndex += 1) {
       const tableName = layer[rowIndex];
-      const x = layerIndex * HORIZONTAL_SPACING;
-      tablePosition.set(tableName, { x, y: cursorY });
+      tablePosition.set(tableName, { x: layerIndex * HORIZONTAL_SPACING, y: cursorY });
       rowLookup.set(tableName, rowIndex);
       cursorY += heights[rowIndex] + VERTICAL_GAP;
     }
   }
 
+  return tablePosition;
+}
+
+/** Handle id for one side of a column row: "<column>-L" or "<column>-R". */
+export function columnHandleId(column: string, side: "L" | "R"): string {
+  return `${column}-${side}`;
+}
+
+export function parseColumnHandleId(handleId: string | null | undefined): string | null {
+  if (!handleId) return null;
+  const match = handleId.match(/^(.*)-(L|R)$/);
+  return match ? match[1] : null;
+}
+
+function uniqueColumnsOf(table: ERD["tables"][number]): string[] {
+  const single = (cols: string[]) => cols.length === 1;
+  return Array.from(
+    new Set([
+      ...table.constraints.filter((c) => c.type === "UNIQUE" && single(c.columns)).map((c) => c.columns[0]),
+      ...table.indexes.filter((i) => i.unique && single(i.columns)).map((i) => i.columns[0]),
+    ])
+  );
+}
+
+/**
+ * Transform ERD to React Flow nodes. Saved positions win; tables without one
+ * get a simple layered position (parents left of the tables that reference them).
+ */
+export function erdToNodes(
+  erd: ERD,
+  ontology: Ontology | null,
+  positions: Record<string, { x: number; y: number }> = {}
+): Node<ERDNodeData>[] {
+  const fallback = layeredPositions(erd);
+
   return erd.tables.map((table, index) => {
-    // Find the corresponding object type for status/confidence
-    const objectType = ontology.objectTypes.find(
+    const objectType = ontology?.objectTypes.find(
       (o) => o.id === table.objectTypeId || o.name === table.name.replace(/_/g, " ")
     );
-    const position = tablePosition.get(table.name) ?? {
-      x: (index % 3) * HORIZONTAL_SPACING,
-      y: Math.floor(index / 3) * VERTICAL_SPACING,
-    };
+    const position = positions[table.id] ??
+      fallback.get(table.name) ?? {
+        x: (index % 3) * HORIZONTAL_SPACING,
+        y: Math.floor(index / 3) * VERTICAL_SPACING,
+      };
 
     return {
       id: table.id,
@@ -174,38 +196,67 @@ export function erdToNodes(erd: ERD, ontology: Ontology): Node<ERDNodeData>[] {
         status: objectType?.status || "active",
         confidence: objectType?.confidence || "high",
         objectTypeId: table.objectTypeId,
+        uniqueColumns: uniqueColumnsOf(table),
       },
     };
   });
 }
 
 /**
- * Transform ERD relationships to React Flow edges
+ * Transform ERD relationships to React Flow edges, column to column.
+ * Each end attaches to the side of its table that faces the other table.
  */
-export function erdToEdges(erd: ERD): Edge<ERDEdgeData>[] {
-  return erd.relationships.map((rel) => {
-    const fromTable = erd.tables.find((t) => t.name === rel.fromTable);
-    const hasFkHandle = Boolean(
-      fromTable?.columns.some(
-        (column) => column.name === rel.fromColumn && column.isForeignKey
-      )
-    );
+export function erdToEdges(
+  erd: ERD,
+  positions: Record<string, { x: number; y: number }> = {},
+  widths: Record<string, number> = {}
+): Edge<ERDEdgeData>[] {
+  const tableByName = new Map(erd.tables.map((t) => [t.name, t]));
 
-    return {
+  return erd.relationships.flatMap((rel) => {
+    const from = tableByName.get(rel.fromTable);
+    const to = tableByName.get(rel.toTable);
+    if (!from || !to) return [];
+
+    let sourceSide: "L" | "R" = "L";
+    let targetSide: "L" | "R" = "R";
+    if (from.id === to.id) {
+      sourceSide = "R";
+      targetSide = "R";
+    } else {
+      const fromPos = positions[from.id];
+      const toPos = positions[to.id];
+      if (fromPos && toPos) {
+        const fromWidth = widths[from.id] ?? 280;
+        const toWidth = widths[to.id] ?? 280;
+        const fromCenter = fromPos.x + fromWidth / 2;
+        const toCenter = toPos.x + toWidth / 2;
+        if (Math.abs(toCenter - fromCenter) < (fromWidth + toWidth) / 2) {
+          // Stacked tables: attach both ends on the same side for a short bracket.
+          sourceSide = "R";
+          targetSide = "R";
+        } else if (toCenter > fromCenter) {
+          sourceSide = "R";
+          targetSide = "L";
+        }
+      }
+    }
+
+    return [{
       id: rel.id,
       type: "erdRelation",
-      source: fromTable?.id || rel.fromTable,
-      target: erd.tables.find((t) => t.name === rel.toTable)?.id || rel.toTable,
-      sourceHandle: hasFkHandle ? `${rel.fromColumn}-source` : undefined,
+      source: from.id,
+      target: to.id,
+      sourceHandle: columnHandleId(rel.fromColumn, sourceSide),
+      targetHandle: columnHandleId(rel.toColumn, targetSide),
       data: {
         cardinality: rel.cardinality,
         required: rel.required,
         onDelete: rel.onDelete,
         fromColumn: rel.fromColumn,
         toColumn: rel.toColumn,
-        edgeSource: "generated",
       },
-    };
+    }];
   });
 }
 

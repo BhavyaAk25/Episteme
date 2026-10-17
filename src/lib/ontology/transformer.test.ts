@@ -138,14 +138,14 @@ describe("erdToNodes", () => {
 describe("erdToEdges", () => {
   const edges = erdToEdges(erd);
 
-  it("returns one edge per relationship marked as generated", () => {
+  it("returns one edge per relationship", () => {
     expect(edges).toHaveLength(1);
-    expect(edges[0].data?.edgeSource).toBe("generated");
     expect(edges[0].data?.cardinality).toBe("1:N");
   });
 
-  it("binds the edge to the FK source handle", () => {
-    expect(edges[0].sourceHandle).toBe("customer_id-source");
+  it("binds the edge from the FK column to the referenced column", () => {
+    expect(edges[0].sourceHandle).toBe("customer_id-L");
+    expect(edges[0].targetHandle).toBe("id-R");
     expect(edges[0].source).toBe("orders");
     expect(edges[0].target).toBe("customers");
   });

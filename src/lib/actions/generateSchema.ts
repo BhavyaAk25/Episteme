@@ -1,7 +1,9 @@
 import { useProjectStore } from "@/store/useProjectStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
 import { useSimulationStore } from "@/store/useSimulationStore";
-import { erdToNodes, erdToEdges, erdToSql } from "@/lib/ontology/transformer";
+import { useErdStore } from "@/store/useErdStore";
+import { importErd } from "@/lib/erd/model";
+import { layoutErd } from "@/lib/erd/layout";
 
 interface GenerateErrorBody {
   error?: string;
@@ -62,14 +64,18 @@ export async function generateSchema(): Promise<void> {
   // Results from the previous schema no longer apply.
   useSimulationStore.getState().reset();
 
-  const canvas = useCanvasStore.getState();
-  canvas.selectNode(null);
-  if (result.erd && result.ontology) {
-    canvas.setNodes(erdToNodes(result.erd, result.ontology));
-    canvas.setEdges(erdToEdges(result.erd));
-    useProjectStore.getState().setSchemaSql(erdToSql(result.erd));
-  } else {
-    canvas.setNodes([]);
-    canvas.setEdges([]);
+  useCanvasStore.getState().selectNode(null);
+  if (result.erd) {
+    // Lay out before loading so the new schema arrives as one undoable step
+    // (Undo brings back whatever was on the canvas before).
+    const erd = importErd(result.erd);
+    let positions = {};
+    try {
+      positions = await layoutErd(erd);
+    } catch {
+      positions = {};
+    }
+    useErdStore.getState().loadErd(erd, positions);
+    useCanvasStore.getState().requestFit();
   }
 }
