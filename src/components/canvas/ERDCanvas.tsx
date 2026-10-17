@@ -20,6 +20,8 @@ import { useUIStore } from "@/store/useUIStore";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useErdStore, undoErd, redoErd } from "@/store/useErdStore";
 import { useReplayView } from "@/lib/erd/useReplayView";
+import { useAiEditStore } from "@/store/useAiEditStore";
+import { AiEditBar } from "./AiEditBar";
 import { erdToNodes, erdToEdges, parseColumnHandleId } from "@/lib/ontology/transformer";
 import { ERDTableNode } from "./ERDTableNode";
 import { ERDRelationEdge } from "./ERDRelationEdge";
@@ -39,8 +41,14 @@ function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 export function ERDCanvas() {
-  const { viewErd, active: replaying } = useReplayView();
-  const positions = useErdStore((state) => state.positions);
+  const { viewErd, locked: replaying, previewing } = useReplayView();
+  const savedPositions = useErdStore((state) => state.positions);
+  const previewPositions = useAiEditStore((state) => state.previewPositions);
+  const diff = useAiEditStore((state) => state.diff);
+  const positions = useMemo(
+    () => (previewing ? { ...savedPositions, ...previewPositions } : savedPositions),
+    [previewing, savedPositions, previewPositions]
+  );
   const ontology = useProjectStore((state) => state.ontology);
   const isGenerating = useProjectStore((state) => state.isGenerating);
   const generationError = useProjectStore((state) => state.generationError);
@@ -54,15 +62,18 @@ export function ERDCanvas() {
     const fresh = viewErd ? erdToNodes(viewErd, ontology, positions) : [];
     const { nodes: previous, selectedNodeId: selectedId } = useCanvasStore.getState();
     const previousById = new Map(previous.map((node) => [node.id, node]));
+    const added = new Set(previewing ? diff.addedTableIds : []);
+    const changed = new Set(previewing ? diff.changedTableIds : []);
     setNodes(
       fresh.map((node) => ({
         ...node,
+        data: { ...node.data, diff: added.has(node.id) ? "added" : changed.has(node.id) ? "changed" : undefined },
         measured: previousById.get(node.id)?.measured,
         selected: node.id === selectedId,
         draggable: !replaying,
       }))
     );
-  }, [viewErd, ontology, positions, replaying, setNodes]);
+  }, [viewErd, ontology, positions, replaying, previewing, diff, setNodes]);
 
   // Edges follow live node positions so each end attaches to the facing side.
   const edges = useMemo(() => {
@@ -203,6 +214,7 @@ export function ERDCanvas() {
       </ReactFlow>
 
       <EditorToast />
+      {hasSchema && <AiEditBar />}
 
       {showEmptyState && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none dotted-grid-bg">

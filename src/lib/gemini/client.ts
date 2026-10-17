@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 
 // Initialize the Gemini client
 const apiKey = process.env.GEMINI_API_KEY?.trim() ?? "";
@@ -88,7 +88,19 @@ function envInt(name: string, fallback: number, min: number, max: number): numbe
 
 const DEFAULT_GENERATE_MAX_RETRIES = envInt("GEMINI_MAX_RETRIES_GENERATE", 1, 0, 5);
 const DEFAULT_AUTOFIX_MAX_RETRIES = envInt("GEMINI_MAX_RETRIES_AUTOFIX", 1, 0, 3);
-const DEFAULT_GENERATE_MAX_OUTPUT_TOKENS = envInt("GEMINI_GENERATE_MAX_OUTPUT_TOKENS", 8192, 512, 16384);
+// Gemini 3's thinking tokens count toward the output budget, so leave room.
+const DEFAULT_GENERATE_MAX_OUTPUT_TOKENS = envInt("GEMINI_GENERATE_MAX_OUTPUT_TOKENS", 16384, 512, 65536);
+
+// "low" keeps schema quality while cutting latency and token use a lot.
+// Set GEMINI_THINKING_LEVEL=off to send no thinking config (older models).
+const THINKING_LEVEL = (process.env.GEMINI_THINKING_LEVEL ?? "low").trim().toLowerCase();
+const THINKING_LEVELS: Record<string, ThinkingLevel> = {
+  minimal: ThinkingLevel.MINIMAL,
+  low: ThinkingLevel.LOW,
+  medium: ThinkingLevel.MEDIUM,
+  high: ThinkingLevel.HIGH,
+};
+const thinkingConfig = THINKING_LEVELS[THINKING_LEVEL] ? { thinkingLevel: THINKING_LEVELS[THINKING_LEVEL] } : undefined;
 const DEFAULT_AUTOFIX_MAX_OUTPUT_TOKENS = envInt("GEMINI_AUTOFIX_MAX_OUTPUT_TOKENS", 4096, 256, 8192);
 const DEFAULT_RETRY_DELAY_MS = envInt("GEMINI_RETRY_DELAY_MS", 1200, 200, 15000);
 const DEFAULT_COOLDOWN_MS = envInt("GEMINI_QUOTA_COOLDOWN_MS", 15000, 5000, 300000);
@@ -177,6 +189,8 @@ function parseProviderCode(message: string): string | null {
   if (upper.includes("RESOURCE_EXHAUSTED")) return "RESOURCE_EXHAUSTED";
   if (upper.includes("RATE_LIMIT_EXCEEDED")) return "RATE_LIMIT_EXCEEDED";
   if (upper.includes("TOO_MANY_REQUESTS")) return "TOO_MANY_REQUESTS";
+  if (upper.includes("UNAVAILABLE") || upper.includes("OVERLOADED")) return "UNAVAILABLE";
+  if (upper.includes("INTERNAL")) return "INTERNAL";
   if (message.includes("429")) return "HTTP_429";
   return null;
 }
@@ -347,12 +361,14 @@ export async function callGemini(
         responseSchema?: unknown;
         responseJsonSchema?: unknown;
         systemInstruction?: string;
+        thinkingConfig?: { thinkingLevel: ThinkingLevel };
       } = {
         temperature,
         topK: 40,
         topP: 0.95,
         maxOutputTokens,
         responseMimeType,
+        ...(thinkingConfig && modelName.startsWith("gemini-3") ? { thinkingConfig } : {}),
       };
 
       if (responseSchema !== undefined) {
@@ -434,3 +450,74 @@ export async function callGemini(
 
   throw normalizeGeminiError(lastError || new Error("Failed to call Gemini after retries"));
 }
+
+/**
+ * Stream a Gemini response as text chunks. Used for live generation progress.
+ * Errors before the first chunk are normalised like callGemini's.
+ */
+export async function* streamGemini(
+  prompt: string,
+  options: { systemInstruction?: string; maxOutputTokens?: number; temperature?: number } = {}
+): AsyncGenerator<string> {
+  const configStatus = getGeminiConfigStatus();
+  if (!configStatus.ready || !genai) {
+    throw new GeminiApiError(configStatus.message, {
+      isQuotaOrRateLimited: false,
+      isCooldown: false,
+      isTruncated: false,
+      providerCode: configStatus.reasonCode ?? "MISSING_API_KEY",
+      retryAfterMs: null,
+      message: configStatus.message,
+    });
+  }
+
+  if (Date.now() < quotaCooldownUntilMs) {
+    throw new GeminiApiError("Gemini quota cooldown is active.", {
+      isQuotaOrRateLimited: true,
+      isCooldown: true,
+      isTruncated: false,
+      providerCode: "LOCAL_COOLDOWN",
+      retryAfterMs: quotaCooldownUntilMs - Date.now(),
+      message: "Gemini quota cooldown is active",
+    });
+  }
+
+  const config: Record<string, unknown> = {
+    temperature: options.temperature ?? 1.0,
+    topK: 40,
+    topP: 0.95,
+    maxOutputTokens: options.maxOutputTokens ?? DEFAULT_GENERATE_MAX_OUTPUT_TOKENS,
+    responseMimeType: "application/json",
+  };
+  if (options.systemInstruction) config.systemInstruction = options.systemInstruction;
+  if (thinkingConfig && MODEL_NAME.startsWith("gemini-3")) config.thinkingConfig = thinkingConfig;
+
+  try {
+    const stream = await genai.models.generateContentStream({ model: MODEL_NAME, contents: prompt, config });
+    let finishReason: string | undefined;
+    for await (const chunk of stream) {
+      const text = chunk.text;
+      if (text) yield text;
+      finishReason = chunk.candidates?.[0]?.finishReason ?? finishReason;
+    }
+    if (finishReason === "MAX_TOKENS") {
+      throw new GeminiApiError("Gemini response was truncated before completing JSON.", {
+        isQuotaOrRateLimited: false,
+        isCooldown: false,
+        isTruncated: true,
+        providerCode: "MAX_TOKENS",
+        retryAfterMs: null,
+        message: "MAX_TOKENS",
+      });
+    }
+  } catch (error) {
+    if (error instanceof GeminiApiError) throw error;
+    const normalized = error instanceof Error ? error : new Error(String(error));
+    if (isQuotaOrRateLimitError(normalized.message)) {
+      quotaCooldownUntilMs = Date.now() + (parseRetryAfterMs(normalized.message) ?? DEFAULT_COOLDOWN_MS);
+    }
+    throw normalizeGeminiError(normalized);
+  }
+}
+
+export { extractJSON };

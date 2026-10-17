@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useProjectStore } from "@/store/useProjectStore";
+import { useProjectStore, type GenerationProgress } from "@/store/useProjectStore";
 import { useUIStore } from "@/store/useUIStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
 import { generateSchema } from "@/lib/actions/generateSchema";
@@ -22,7 +22,7 @@ function useElapsedSeconds(startedAt: number | null): number {
  * fails. Never shows fake progress.
  */
 export function GenerationStatus() {
-  const { isGenerating, generationStartedAt, generationError, setGenerationError } = useProjectStore();
+  const { isGenerating, generationStartedAt, generationError, setGenerationError, generationProgress } = useProjectStore();
   const hasNodes = useCanvasStore((state) => state.nodes.length > 0);
   const elapsed = useElapsedSeconds(isGenerating ? generationStartedAt : null);
 
@@ -31,21 +31,18 @@ export function GenerationStatus() {
       return (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2.5 rounded-full border border-border bg-surface px-4 py-2 shadow-md">
           <span className="w-3.5 h-3.5 rounded-full border-2 border-accent/30 border-t-accent animate-spin" />
-          <span className="text-[13px] text-foreground">Generating a new schema… {elapsed}s</span>
+          <span className="text-[13px] text-foreground">
+            {generationProgress?.tables.length
+              ? `Designing tables (${generationProgress.tables.length})… ${elapsed}s`
+              : `Generating a new schema… ${elapsed}s`}
+          </span>
         </div>
       );
     }
 
     return (
       <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-        <div className="w-[380px] max-w-[90%] rounded-xl border border-border bg-surface p-6 shadow-lg text-center">
-          <span className="inline-block w-6 h-6 rounded-full border-[3px] border-accent/25 border-t-accent animate-spin" />
-          <h3 className="mt-3 text-[15px] font-semibold text-foreground">Designing your schema</h3>
-          <p className="mt-1 text-[13px] text-muted">
-            The AI is working out tables, columns and relationships. This usually takes 20–60 seconds.
-          </p>
-          <p className="mt-3 font-mono text-[12px] text-muted">{elapsed}s elapsed</p>
-        </div>
+        <GenerationProgressCard elapsed={elapsed} progress={generationProgress} />
       </div>
     );
   }
@@ -94,6 +91,61 @@ export function GenerationStatus() {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+const PHASES: Array<{ key: GenerationProgress["phase"]; label: string }> = [
+  { key: "plan", label: "Understanding your system" },
+  { key: "ontology", label: "Modelling entities" },
+  { key: "erd", label: "Designing tables" },
+  { key: "relationships", label: "Linking relationships" },
+];
+
+function GenerationProgressCard({ elapsed, progress }: { elapsed: number; progress: GenerationProgress | null }) {
+  const current = PHASES.findIndex((phase) => phase.key === (progress?.phase ?? "plan"));
+  const tables = progress?.tables ?? [];
+
+  return (
+    <div className="w-[400px] max-w-[90%] rounded-xl border border-border bg-surface p-5 shadow-lg">
+      <div className="flex items-center justify-between">
+        <h3 className="text-[15px] font-semibold text-foreground">Designing your schema</h3>
+        <span className="font-mono text-[12px] text-muted">{elapsed}s</span>
+      </div>
+      <ol className="mt-3 space-y-1.5">
+        {PHASES.map((phase, index) => {
+          const state = index < current ? "done" : index === current ? "active" : "pending";
+          return (
+            <li key={phase.key} className="flex items-center gap-2.5 text-[13px]">
+              {state === "done" ? (
+                <span className="w-4 h-4 rounded-full bg-[#2E7D32] flex items-center justify-center">
+                  <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </span>
+              ) : state === "active" ? (
+                <span className="w-4 h-4 rounded-full border-2 border-accent/25 border-t-accent animate-spin" />
+              ) : (
+                <span className="w-4 h-4 rounded-full border border-border" />
+              )}
+              <span className={state === "pending" ? "text-muted" : "text-foreground"}>
+                {phase.label}
+                {phase.key === "erd" && tables.length > 0 ? ` (${tables.length})` : ""}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      {tables.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1">
+          {tables.map((name) => (
+            <span key={name} className="px-1.5 py-0.5 rounded bg-node-header font-mono text-[11px] text-foreground">
+              {name}
+            </span>
+          ))}
+        </div>
+      )}
+      <p className="mt-3 text-[11px] text-muted">Usually 20–40 seconds. Progress comes straight from the AI as it writes.</p>
     </div>
   );
 }

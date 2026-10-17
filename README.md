@@ -17,6 +17,10 @@ Episteme transforms a natural-language description into a complete database syst
 ## Key Features
 
 - **AI schema generation** — one structured Gemini 3 call turns a prompt into a full plan → ontology → ERD → build script, validated end-to-end with Zod.
+- **Live generation progress** — the AI's answer streams in, so you see real phases and each table name as it's designed.
+- **Ask AI to change…** — describe a change ("add reviews with a 1–5 rating"). The AI proposes small, validated edit operations; you preview them on the canvas (new tables green, changed amber) and apply or discard. Applying is one undoable step.
+- **Projects & version history** — keep several schemas, rename/delete them, and restore earlier versions. Versions are saved on every generation, AI change, and on demand. Everything is stored in your browser (IndexedDB), no account needed.
+- **Free AI providers** — Gemini free tier by default; Groq, OpenRouter free models or a local Ollama work through `AI_PROVIDER`.
 - **Build replay** — watch the current schema assemble step by step. The replay is a view, so it never changes your edits.
 - **Palantir-inspired ontology** — object types, link types, and action types with preconditions, transaction plans, and side effects.
 - **Chaos testing** — automated adversarial tests (duplicate keys, NULL violations, orphaned foreign keys, CHECK violations) executed in an in-browser SQLite sandbox — no server required.

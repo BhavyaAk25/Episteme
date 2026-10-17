@@ -65,6 +65,8 @@ export interface ERDNodeData extends Record<string, unknown> {
   objectTypeId: string;
   /** Columns with a single-column UNIQUE constraint or unique index. */
   uniqueColumns: string[];
+  /** Set while previewing an AI edit. */
+  diff?: "added" | "changed";
 }
 
 export interface ERDEdgeData extends Record<string, unknown> {

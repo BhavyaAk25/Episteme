@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { callGemini, getGeminiErrorInfo } from "@/lib/gemini/client";
+import { getGeminiErrorInfo } from "@/lib/gemini/client";
+import { getAiProvider } from "@/lib/ai/provider";
 import { AUTO_FIX_PROMPT, AUTO_FIX_PROMPT_COMPACT } from "@/lib/gemini/prompts";
 import { parseGeminiJsonLenient } from "@/lib/gemini/jsonRepair";
 import { AutoFixResponseSchema } from "@/lib/gemini/schemas";
@@ -522,7 +523,8 @@ async function generatePatchWithGemini(
     parseMode?: string;
   }> => {
     try {
-      const raw = await callGemini(prompt, {
+      const raw = await getAiProvider().generateJson({
+        user: prompt,
         operation: "autofix",
         maxRetries: AUTOFIX_MAX_RETRIES,
         retryDelay: 1000,

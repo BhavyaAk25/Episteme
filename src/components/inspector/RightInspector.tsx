@@ -13,7 +13,7 @@ export function RightInspector() {
   const { selectedNodeId, selectedEdgeId } = useCanvasStore();
   const { inspectorOpen, closeInspector, inspectorWidth } = useUIStore();
   const erd = useErdStore((state) => state.erd);
-  const { active: replaying } = useReplayView();
+  const { locked: replaying } = useReplayView();
 
   const table = selectedNodeId ? erd?.tables.find((t) => t.id === selectedNodeId) : undefined;
   const relationship = selectedEdgeId ? erd?.relationships.find((r) => r.id === selectedEdgeId) : undefined;

@@ -3,6 +3,11 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import type { BuildPhase, Plan, GenerationResponse } from "@/types/gemini";
 import type { Ontology } from "@/types/ontology";
 
+export interface GenerationProgress {
+  phase: "plan" | "ontology" | "erd" | "relationships";
+  tables: string[];
+}
+
 export interface GenerationError {
   message: string;
   reason: string | null;
@@ -21,6 +26,7 @@ interface ProjectState {
   errorTitle: string | null;
   generationStartedAt: number | null;
   generationError: GenerationError | null;
+  generationProgress: GenerationProgress | null;
 
   // Generated data
   plan: Plan | null;
@@ -44,6 +50,7 @@ interface ProjectState {
   setError: (error: string | null) => void;
   setErrorWithTitle: (title: string, error: string) => void;
   setGenerationError: (error: GenerationError | null) => void;
+  setGenerationProgress: (progress: GenerationProgress | null) => void;
 
   // Animation controls
   setCurrentBuildStep: (step: number) => void;
@@ -62,6 +69,7 @@ const initialState = {
   errorTitle: null,
   generationStartedAt: null as number | null,
   generationError: null as GenerationError | null,
+  generationProgress: null as GenerationProgress | null,
   plan: null,
   ontology: null,
   generationMode: null,
@@ -88,6 +96,7 @@ export const useProjectStore = create<ProjectState>()(
     isGenerating: true,
     generationStartedAt: Date.now(),
     generationError: null,
+    generationProgress: null,
     error: null,
     currentBuildStep: 0,
     isPlaying: false,
@@ -123,6 +132,8 @@ export const useProjectStore = create<ProjectState>()(
     isGenerating: false,
     generationStartedAt: null,
   }),
+
+  setGenerationProgress: (generationProgress) => set({ generationProgress }),
 
   setGenerationError: (generationError) => set({
     generationError,

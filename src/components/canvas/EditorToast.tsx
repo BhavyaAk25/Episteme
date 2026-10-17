@@ -19,7 +19,7 @@ export function EditorToast() {
   return (
     <div
       role="alert"
-      className="absolute top-3 left-1/2 -translate-x-1/2 z-40 max-w-[520px] flex items-start gap-3 rounded-lg border border-error/30 bg-surface px-4 py-2.5 shadow-lg"
+      className="absolute top-[72px] left-1/2 -translate-x-1/2 z-40 max-w-[520px] flex items-start gap-3 rounded-lg border border-error/30 bg-surface px-4 py-2.5 shadow-lg"
     >
       <span className="mt-1 w-2 h-2 rounded-full bg-error shrink-0" />
       <p className="text-[13px] text-foreground">{lastError}</p>
