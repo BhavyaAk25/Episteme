@@ -154,7 +154,7 @@ export function VerifyPanel() {
                 </div>
                 <div className="flex items-center gap-2">
                   {tab === "issues" && fixable.length > 0 && (
-                    <button onClick={() => applyIssueFixes(fixable)} className="h-8 px-3 rounded-md bg-brand text-white text-[12px] font-semibold">
+                    <button onClick={() => applyIssueFixes(fixable)} className="h-8 px-3 rounded-md bg-brand text-brand-ink text-[12px] font-semibold">
                       Fix all {fixable.length}
                     </button>
                   )}

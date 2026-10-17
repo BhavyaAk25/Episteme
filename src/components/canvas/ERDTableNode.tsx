@@ -56,7 +56,7 @@ function ERDTableNodeComponent({ data, selected }: NodeProps) {
     >
       {nodeData.diff && (
         <span
-          className={`absolute -top-2.5 right-3 px-1.5 py-px rounded text-[10px] font-semibold text-white ${
+          className={`absolute -top-2.5 right-3 px-1.5 py-px rounded text-[10px] font-semibold text-canvas ${
             nodeData.diff === "added" ? "bg-success" : "bg-warning"
           }`}
         >

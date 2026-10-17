@@ -115,11 +115,11 @@ export function AiEditBar() {
         <button
           type="submit"
           disabled={loading || !draft.trim()}
-          className="h-8 px-3.5 rounded-full bg-brand text-white text-[12px] font-semibold disabled:opacity-40 flex items-center gap-1.5"
+          className="h-8 px-3.5 rounded-full bg-brand text-brand-ink text-[12px] font-semibold disabled:opacity-40 flex items-center gap-1.5"
         >
           {loading ? (
             <>
-              <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              <span className="w-3 h-3 border-2 border-brand-ink/40 border-t-brand-ink rounded-full animate-spin" />
               Thinking…
             </>
           ) : (
