@@ -189,7 +189,7 @@ export function TableEditor({ table }: { table: Table }) {
       <div className="space-y-1">
         {extraConstraints.map(({ constraint, index }) => (
           <div key={index} className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-foreground/[0.025]">
-            <span className={`text-[10px] font-mono font-semibold ${constraint.type === "CHECK" ? "text-warning" : "text-purple"}`}>
+            <span className={`text-[10px] font-mono font-semibold ${constraint.type === "CHECK" ? "text-warning" : "text-teal"}`}>
               {constraint.type}
             </span>
             <span className="flex-1 min-w-0 truncate font-mono text-[11px] text-foreground">
@@ -233,7 +233,7 @@ export function TableEditor({ table }: { table: Table }) {
             <span className="flex-1 min-w-0 truncate font-mono text-[11px] text-foreground" title={index.name}>
               ({index.columns.join(", ")})
             </span>
-            {index.unique && <span className="text-[10px] font-mono font-semibold text-purple">UNIQUE</span>}
+            {index.unique && <span className="text-[10px] font-mono font-semibold text-teal">UNIQUE</span>}
             <button
               type="button"
               onClick={() => removeIndex(table.id, index.name)}

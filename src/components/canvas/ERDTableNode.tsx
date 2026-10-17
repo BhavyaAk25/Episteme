@@ -88,7 +88,7 @@ function ERDTableNodeComponent({ data, selected }: NodeProps) {
               {col.name}
             </span>
             {unique.has(col.name) && !col.isPrimaryKey && (
-              <span className="text-[9px] font-mono font-semibold text-purple" title="Unique">UQ</span>
+              <span className="text-[9px] font-mono font-semibold text-teal" title="Unique">UQ</span>
             )}
             <span className="text-[11px] font-mono text-muted">{col.dataType}</span>
             <span className="w-2 text-[10px] text-error font-semibold" title={col.nullable ? "Nullable" : "NOT NULL"}>
@@ -105,7 +105,7 @@ function ERDTableNodeComponent({ data, selected }: NodeProps) {
             <div key={idx} className="flex items-center gap-1.5 text-[10px] text-muted">
               <span
                 className={`inline-flex items-center rounded px-1 py-px font-mono font-semibold ${
-                  constraint.type === "CHECK" ? "bg-warning/15 text-warning" : "bg-purple/15 text-purple"
+                  constraint.type === "CHECK" ? "bg-warning/15 text-warning" : "bg-teal/15 text-teal"
                 }`}
               >
                 {constraint.type === "CHECK" ? "CK" : "UQ"}

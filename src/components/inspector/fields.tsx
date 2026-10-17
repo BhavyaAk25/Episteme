@@ -86,7 +86,7 @@ export function FlagToggle({
   const activeTone = {
     neutral: "bg-pill text-foreground border-border-hover",
     key: "bg-warning/15 text-warning border-warning/40",
-    unique: "bg-purple/15 text-purple border-purple/40",
+    unique: "bg-teal/15 text-teal border-teal/40",
     danger: "bg-error/10 text-error border-error/30",
   }[tone];
   return (
