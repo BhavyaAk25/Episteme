@@ -51,7 +51,7 @@ export function ShortcutsDialog() {
 
   if (!shortcutsOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(30,22,12,0.35)] p-4" onClick={() => setShortcutsOpen(false)}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" onClick={() => setShortcutsOpen(false)}>
       <div role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" className="w-[420px] max-w-full rounded-xl border border-border bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
           <h2 className="text-[15px] font-semibold text-foreground">Keyboard shortcuts</h2>
