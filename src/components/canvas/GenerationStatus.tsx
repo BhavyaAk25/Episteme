@@ -58,7 +58,7 @@ export function GenerationStatus() {
   };
 
   return (
-    <div className="absolute inset-0 z-30 flex items-center justify-center bg-[rgba(56,40,22,0.12)] p-4">
+    <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/45 p-4">
       <div role="alert" className="w-[440px] max-w-full rounded-xl border border-border bg-surface p-6 shadow-xl">
         <div className="flex items-start gap-3">
           <span className="mt-0.5 w-9 h-9 shrink-0 rounded-full bg-error/15 flex items-center justify-center">

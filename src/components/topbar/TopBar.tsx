@@ -77,8 +77,8 @@ export function TopBar() {
 
   return (
     <header className="relative z-40 bg-surface/94 backdrop-blur border-b border-border px-4 md:px-6 pt-[calc(env(safe-area-inset-top,0px)+12px)] shadow-[0_6px_18px_rgba(86,61,38,0.08)]">
-      <div className="min-h-[92px] flex items-center">
-        <div className="flex items-center gap-4 w-full min-w-0">
+      <div className="min-h-[72px] py-2 flex items-center">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-x-4 gap-y-2 w-full min-w-0">
           <div className="flex items-center gap-2.5 shrink-0">
             <div className="w-10 h-10 flex items-center justify-center">
               <Image
@@ -95,7 +95,8 @@ export function TopBar() {
           </div>
           <ProjectSwitcher />
 
-          <div className="flex-1 min-w-0">
+          {/* On narrow screens the description gets its own full-width row. */}
+          <div className="order-last basis-full lg:order-none lg:basis-auto lg:flex-1 min-w-0">
             <input
               type="text"
               value={prompt}
@@ -111,7 +112,7 @@ export function TopBar() {
 
           <button
             onClick={handleGenerate}
-            title="Generate (Ctrl/Cmd + G)"
+            title="Generate (⌘/Ctrl + Enter)"
             disabled={!prompt.trim() || isGenerating}
             className="ui-primary-btn disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5 shrink-0"
           >
@@ -125,7 +126,7 @@ export function TopBar() {
             )}
           </button>
 
-          <div className="flex items-center gap-3 shrink-0 mr-12 md:mr-16">
+          <div className="flex items-center gap-2 lg:gap-3 shrink-0 ml-auto lg:ml-0">
             <button
               onClick={handleRunTests}
               title="Run the schema in real Postgres and test every rule"
