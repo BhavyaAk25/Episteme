@@ -113,8 +113,12 @@ function respondWithoutGemini(args: Parameters<typeof buildFallbackResponse>[0])
       : args.reason === "quota"
         ? "The AI model's free-tier quota is used up right now, so your schema couldn't be generated."
         : args.reason === "parse_error" || args.reason === "validation_error"
-          ? "The AI model returned a response that wasn't a valid schema."
-          : "The AI model couldn't be reached.";
+          ? "The AI model returned a response that wasn't a valid schema. Trying again usually works."
+          : args.providerErrorCode && ["INVALID_API_KEY", "UNAUTHENTICATED", "PERMISSION_DENIED"].includes(args.providerErrorCode)
+            ? "The AI key on this deployment was rejected (invalid or revoked). Update GEMINI_API_KEY and redeploy."
+            : args.providerErrorCode && ["MODEL_NOT_FOUND", "NOT_FOUND"].includes(args.providerErrorCode)
+              ? "The configured AI model isn't available. Check GEMINI_MODEL."
+              : "The AI model couldn't be reached.";
 
   return NextResponse.json(
     {
