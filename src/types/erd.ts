@@ -63,9 +63,9 @@ export interface ERDNodeData extends Record<string, unknown> {
   status: Status;
   confidence: Confidence;
   objectTypeId: string;
+  /** Columns with a single-column UNIQUE constraint or unique index. */
+  uniqueColumns: string[];
 }
-
-export type EdgeSource = "generated" | "user";
 
 export interface ERDEdgeData extends Record<string, unknown> {
   cardinality: Cardinality;
@@ -73,5 +73,4 @@ export interface ERDEdgeData extends Record<string, unknown> {
   onDelete: OnDeleteAction;
   fromColumn: string;
   toColumn: string;
-  edgeSource: EdgeSource;
 }

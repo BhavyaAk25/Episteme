@@ -123,10 +123,6 @@ body {
   background-color: var(--bg-node) !important;
 }
 
-/* Selection ring */
-.react-flow__node.selected {
-  box-shadow: 0 0 0 2px var(--accent-blue);
-}
 
 /* Let custom edge components control their own stroke colors */
 
@@ -232,4 +228,16 @@ nextjs-portal,
 [data-next-badge-root],
 [data-nextjs-toast] {
   display: none !important;
+}
+
+/* Column connection points: hidden until the table is hovered or a connection is being drawn. */
+.erd-handle {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.react-flow__node:hover .erd-handle,
+.react-flow__node.selected .erd-handle,
+.erd-handle.connectingfrom,
+.erd-handle.connectingto {
+  opacity: 1;
 }

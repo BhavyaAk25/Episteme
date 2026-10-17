@@ -10,32 +10,74 @@ import { GenerationStatus } from "@/components/canvas/GenerationStatus";
 import { RightInspector } from "@/components/inspector/RightInspector";
 import { BottomDrawer } from "@/components/simulation/BottomDrawer";
 import { ExportModal } from "@/components/export/ExportModal";
-import { useUIStore } from "@/store/useUIStore";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
-import { erdToNodes, erdToEdges } from "@/lib/ontology/transformer";
+import { useErdStore } from "@/store/useErdStore";
+import { useSimulationStore } from "@/store/useSimulationStore";
+import { layoutErd } from "@/lib/erd/layout";
+import type { ERD } from "@/types/erd";
+
+function readLegacyErd(): ERD | null {
+  try {
+    const raw = window.localStorage.getItem("episteme-project");
+    const erd = raw ? (JSON.parse(raw) as { state?: { erd?: ERD | null } }).state?.erd : null;
+    return erd && Array.isArray(erd.tables) ? erd : null;
+  } catch {
+    return null;
+  }
+}
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function Home() {
-  const { sidebarOpen } = useUIStore();
   const { error, errorTitle, setError } = useProjectStore();
 
-  // Restore the last session from localStorage on mount, then rebuild the
-  // canvas from the persisted ERD so a page refresh doesn't lose work.
+  // Restore the last session from localStorage on mount.
   useEffect(() => {
     let cancelled = false;
-    void Promise.resolve(useProjectStore.persist.rehydrate()).then(() => {
+    void Promise.all([
+      Promise.resolve(useProjectStore.persist.rehydrate()),
+      Promise.resolve(useErdStore.persist.rehydrate()),
+    ]).then(async () => {
       if (cancelled) return;
-      const { erd, ontology } = useProjectStore.getState();
-      if (erd && ontology) {
-        useCanvasStore.getState().setNodes(erdToNodes(erd, ontology));
-        useCanvasStore.getState().setEdges(erdToEdges(erd));
+      const erdState = useErdStore.getState();
+      let erd = erdState.erd;
+      let positions = erdState.positions;
+
+      // Sessions saved before the editor kept the ERD in the project store.
+      if (!erd) {
+        erd = readLegacyErd();
+        positions = {};
+      }
+
+      if (erd) {
+        const missingPositions = erd.tables.some((table) => !positions[table.id]);
+        if (missingPositions) {
+          try {
+            positions = { ...(await layoutErd(erd)), ...positions };
+          } catch {
+            // Fall back to the built-in layered positions.
+          }
+        }
+        if (cancelled) return;
+        useErdStore.getState().loadErd(erd, positions, { resetHistory: true });
+        useCanvasStore.getState().requestFit();
       }
     });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  // Simulation results describe one version of the schema; clear them on edit.
+  useEffect(
+    () =>
+      useErdStore.subscribe((state, previous) => {
+        if (state.erd !== previous.erd && useSimulationStore.getState().results) {
+          useSimulationStore.getState().reset();
+        }
+      }),
+    []
+  );
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -59,12 +101,7 @@ export default function Home() {
         <OntologySidebar />
 
         {/* Center Canvas */}
-        <div
-          className="flex-1 relative"
-          style={{
-            marginLeft: sidebarOpen ? 0 : 0,
-          }}
-        >
+        <div className="flex-1 relative">
           <ERDCanvas />
           <BuildAnimation />
           <CanvasControls />

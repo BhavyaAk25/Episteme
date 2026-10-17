@@ -1,8 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { BuildPhase, BuildScript, Plan, GenerationResponse } from "@/types/gemini";
+import type { BuildPhase, Plan, GenerationResponse } from "@/types/gemini";
 import type { Ontology } from "@/types/ontology";
-import type { ERD } from "@/types/erd";
 
 export interface GenerationError {
   message: string;
@@ -26,9 +25,6 @@ interface ProjectState {
   // Generated data
   plan: Plan | null;
   ontology: Ontology | null;
-  erd: ERD | null;
-  buildScript: BuildScript | null;
-  schemaSql: string | null;
   generationMode: "gemini" | "fallback" | null;
   fallbackDomain: "inventory" | "saas" | "ecommerce" | "generic" | null;
   generationWarning: string | null;
@@ -48,12 +44,10 @@ interface ProjectState {
   setError: (error: string | null) => void;
   setErrorWithTitle: (title: string, error: string) => void;
   setGenerationError: (error: GenerationError | null) => void;
-  setSchemaSql: (sql: string) => void;
 
   // Animation controls
   setCurrentBuildStep: (step: number) => void;
   setIsPlaying: (playing: boolean) => void;
-  nextBuildStep: () => void;
 
   // Reset
   reset: () => void;
@@ -70,9 +64,6 @@ const initialState = {
   generationError: null as GenerationError | null,
   plan: null,
   ontology: null,
-  erd: null,
-  buildScript: null,
-  schemaSql: null,
   generationMode: null,
   fallbackDomain: null,
   generationWarning: null,
@@ -85,7 +76,7 @@ const initialState = {
 
 export const useProjectStore = create<ProjectState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
   ...initialState,
 
   setPrompt: (prompt, templateId) => set({ prompt, templateId: templateId ?? null }),
@@ -107,8 +98,6 @@ export const useProjectStore = create<ProjectState>()(
   setGenerationResult: (result) => set({
     plan: result.plan,
     ontology: result.ontology,
-    erd: result.erd,
-    buildScript: result.buildScript,
     generationMode: result.generationMode ?? result.source ?? "gemini",
     fallbackDomain: result.fallbackDomain ?? null,
     generationWarning: result.warning ?? null,
@@ -141,20 +130,10 @@ export const useProjectStore = create<ProjectState>()(
     generationStartedAt: null,
   }),
 
-  setSchemaSql: (sql) => set({ schemaSql: sql }),
-
   setCurrentBuildStep: (step) => set({ currentBuildStep: step }),
 
   setIsPlaying: (playing) => set({ isPlaying: playing }),
 
-  nextBuildStep: () => {
-    const { buildScript, currentBuildStep } = get();
-    if (buildScript && currentBuildStep < buildScript.steps.length - 1) {
-      set({ currentBuildStep: currentBuildStep + 1 });
-    } else {
-      set({ isPlaying: false });
-    }
-  },
 
   reset: () => set(initialState),
     }),
@@ -170,9 +149,6 @@ export const useProjectStore = create<ProjectState>()(
         templateId: state.templateId,
         plan: state.plan,
         ontology: state.ontology,
-        erd: state.erd,
-        buildScript: state.buildScript,
-        schemaSql: state.schemaSql,
         generationMode: state.generationMode,
         fallbackDomain: state.fallbackDomain,
         generationWarning: state.generationWarning,

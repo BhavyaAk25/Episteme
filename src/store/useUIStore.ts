@@ -53,7 +53,7 @@ const initialState = {
   sidebarOpen: true,
   sidebarWidth: 260,
   inspectorOpen: false,
-  inspectorWidth: 320,
+  inspectorWidth: 380,
   drawerOpen: false,
   drawerHeight: 250,
   playbackSpeed: 1 as PlaybackSpeed,

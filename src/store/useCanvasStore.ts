@@ -1,105 +1,52 @@
 import { create } from "zustand";
-import {
-  type Node,
-  type Edge,
-  type Viewport,
-  applyNodeChanges,
-  applyEdgeChanges,
-  type NodeChange,
-  type EdgeChange,
-} from "@xyflow/react";
-import type { ERDNodeData, ERDEdgeData } from "@/types/erd";
+import { type Node, type Viewport, applyNodeChanges, type NodeChange } from "@xyflow/react";
+import type { ERDNodeData } from "@/types/erd";
 
 type ERDNode = Node<ERDNodeData>;
-type ERDEdge = Edge<ERDEdgeData>;
 
+/**
+ * View state for the diagram. The schema itself lives in useErdStore;
+ * `nodes` here is React Flow's working copy (drag positions, measured sizes,
+ * selection), rebuilt from the ERD whenever it changes.
+ */
 interface CanvasState {
   nodes: ERDNode[];
-  edges: ERDEdge[];
   selectedNodeId: string | null;
   selectedEdgeId: string | null;
   viewport: Viewport;
+  /** Bumped when the whole diagram should be re-fitted (new schema, tidy up). */
+  fitRequest: number;
+  /** Set when one table should be brought into view. */
+  focusRequest: { nodeId: string; seq: number } | null;
 
-  // Node/edge changes (for React Flow callbacks)
   onNodesChange: (changes: NodeChange<ERDNode>[]) => void;
-  onEdgesChange: (changes: EdgeChange<ERDEdge>[]) => void;
-
-  // Selection
+  setNodes: (nodes: ERDNode[]) => void;
   selectNode: (nodeId: string | null) => void;
   selectEdge: (edgeId: string | null) => void;
-
-  // Set state
-  setNodes: (nodes: ERDNode[]) => void;
-  setEdges: (edges: ERDEdge[]) => void;
   setViewport: (viewport: Viewport) => void;
-
-  // Add incrementally (for animation)
-  addNode: (node: ERDNode) => void;
-  addEdge: (edge: ERDEdge) => void;
-  updateNodeData: (nodeId: string, data: Partial<ERDNodeData>) => void;
-
-  // Reset
+  requestFit: () => void;
+  requestFocus: (nodeId: string) => void;
   reset: () => void;
 }
 
 const initialState = {
   nodes: [] as ERDNode[],
-  edges: [] as ERDEdge[],
   selectedNodeId: null,
   selectedEdgeId: null,
   viewport: { x: 0, y: 0, zoom: 1 },
+  fitRequest: 0,
+  focusRequest: null as { nodeId: string; seq: number } | null,
 };
 
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   ...initialState,
 
-  onNodesChange: (changes) => {
-    set({
-      nodes: applyNodeChanges(changes, get().nodes),
-    });
-  },
-
-  onEdgesChange: (changes) => {
-    set({
-      edges: applyEdgeChanges(changes, get().edges),
-    });
-  },
-
-  selectNode: (nodeId) => set({
-    selectedNodeId: nodeId,
-    selectedEdgeId: null,
-  }),
-
-  selectEdge: (edgeId) => set({
-    selectedEdgeId: edgeId,
-    selectedNodeId: null,
-  }),
-
+  onNodesChange: (changes) => set({ nodes: applyNodeChanges(changes, get().nodes) }),
   setNodes: (nodes) => set({ nodes }),
-
-  setEdges: (edges) => set({ edges }),
-
+  selectNode: (nodeId) => set({ selectedNodeId: nodeId, selectedEdgeId: null }),
+  selectEdge: (edgeId) => set({ selectedEdgeId: edgeId, selectedNodeId: null }),
   setViewport: (viewport) => set({ viewport }),
-
-  addNode: (node) => set((state) => ({
-    nodes: state.nodes.some((existing) => existing.id === node.id)
-      ? state.nodes.map((existing) => (existing.id === node.id ? { ...existing, ...node } : existing))
-      : [...state.nodes, node],
-  })),
-
-  addEdge: (edge) => set((state) => ({
-    edges: state.edges.some((existing) => existing.id === edge.id)
-      ? state.edges.map((existing) => (existing.id === edge.id ? { ...existing, ...edge } : existing))
-      : [...state.edges, edge],
-  })),
-
-  updateNodeData: (nodeId, data) => set((state) => ({
-    nodes: state.nodes.map((node) =>
-      node.id === nodeId
-        ? { ...node, data: { ...node.data, ...data } }
-        : node
-    ),
-  })),
-
+  requestFit: () => set({ fitRequest: get().fitRequest + 1 }),
+  requestFocus: (nodeId) => set({ focusRequest: { nodeId, seq: (get().focusRequest?.seq ?? 0) + 1 } }),
   reset: () => set(initialState),
 }));

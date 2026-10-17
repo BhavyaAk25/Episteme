@@ -4,10 +4,20 @@ import { useMemo, useState } from "react";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useSimulationStore } from "@/store/useSimulationStore";
 import { useUIStore } from "@/store/useUIStore";
+import { useErdStore } from "@/store/useErdStore";
+import { erdToSql } from "@/lib/ontology/transformer";
+import { reconcileOntologyWithErd, EMPTY_ONTOLOGY } from "@/lib/ontology/reconcile";
 
 export function ExportModal() {
   const { exportModalOpen, closeExportModal } = useUIStore();
-  const { schemaSql, ontology, prompt } = useProjectStore();
+  const { ontology: generatedOntology, prompt } = useProjectStore();
+  const erd = useErdStore((state) => state.erd);
+  // Always export what's on the canvas, including manual edits.
+  const schemaSql = useMemo(() => (erd && erd.tables.length > 0 ? erdToSql(erd) : null), [erd]);
+  const ontology = useMemo(
+    () => (erd ? reconcileOntologyWithErd(generatedOntology ?? EMPTY_ONTOLOGY, erd) : null),
+    [erd, generatedOntology]
+  );
   const { results } = useSimulationStore();
 
   const [isExporting, setIsExporting] = useState(false);

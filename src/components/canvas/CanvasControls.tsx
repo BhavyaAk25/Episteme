@@ -2,64 +2,40 @@
 
 import { useProjectStore } from "@/store/useProjectStore";
 import { useUIStore } from "@/store/useUIStore";
-import { useCanvasStore } from "@/store/useCanvasStore";
+import { useReplayView } from "@/lib/erd/useReplayView";
 import type { PlaybackSpeed } from "@/lib/utils/animation";
-import type { ERDEdgeData } from "@/types/erd";
 
 const SPEEDS: PlaybackSpeed[] = [0.5, 1, 2, 5];
 
-function getUserEdges() {
-  return useCanvasStore.getState().edges.filter((e) => (e.data as ERDEdgeData | undefined)?.edgeSource === "user");
-}
-
+/** Replay of how the current schema is built, step by step. Never edits the schema. */
 export function CanvasControls() {
-  const { buildScript, isPlaying, setIsPlaying, currentBuildStep, setCurrentBuildStep } = useProjectStore();
+  const { total: totalSteps, active, isPlaying, currentBuildStep } = useReplayView();
+  const { setIsPlaying, setCurrentBuildStep } = useProjectStore();
   const { playbackSpeed, setPlaybackSpeed } = useUIStore();
-  const { nodes, edges, setNodes, setEdges } = useCanvasStore();
 
-  const totalSteps = buildScript?.steps.length || 0;
   const progress = totalSteps > 0 ? (currentBuildStep / totalSteps) * 100 : 0;
 
-  const clearGenerated = () => {
-    const userEdges = getUserEdges();
-    setNodes([]);
-    setEdges(userEdges);
-  };
-
-  const clearAll = () => {
-    setNodes([]);
-    setEdges([]);
-  };
-
   const handlePlayPause = () => {
-    if (!buildScript) return;
-
     if (isPlaying) {
       setIsPlaying(false);
-    } else {
-      if (currentBuildStep >= totalSteps) {
-        setCurrentBuildStep(0);
-        clearGenerated();
-      } else if (currentBuildStep === 0 && (nodes.length > 0 || edges.length > 0)) {
-        clearGenerated();
-      }
-      setIsPlaying(true);
+      return;
     }
+    if (!active) setCurrentBuildStep(0);
+    setIsPlaying(true);
   };
 
   const handleRestart = () => {
     setCurrentBuildStep(0);
-    setIsPlaying(false);
-    clearGenerated();
+    setIsPlaying(true);
   };
 
-  const handleResetAll = () => {
+  // Leave replay and show the full schema again.
+  const handleStop = () => {
+    setIsPlaying(false);
     setCurrentBuildStep(0);
-    setIsPlaying(false);
-    clearAll();
   };
 
-  if (!buildScript || totalSteps === 0) {
+  if (totalSteps === 0) {
     return null;
   }
 
@@ -69,6 +45,8 @@ export function CanvasControls() {
         {/* Play/Pause — 40px circle, warm accent */}
         <button
           onClick={handlePlayPause}
+          aria-label={isPlaying ? "Pause replay" : "Replay how this schema is built"}
+          title={isPlaying ? "Pause" : "Replay build"}
           className="w-10 h-10 rounded-full bg-[#B8976A] flex items-center justify-center hover:brightness-90 transition-all shadow-sm"
         >
           {isPlaying ? (
@@ -93,7 +71,8 @@ export function CanvasControls() {
         {/* Restart — 32px circle, transparent */}
         <button
           onClick={handleRestart}
-          title="Restart replay (keeps your links)"
+          title="Restart replay"
+          aria-label="Restart replay"
           className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-[rgba(0,0,0,0.05)] transition-colors"
         >
           <svg className="w-4 h-4 text-[#8B7355]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -106,19 +85,16 @@ export function CanvasControls() {
           </svg>
         </button>
 
-        {/* Reset All — 32px circle, transparent with error hint */}
+        {/* Stop — back to the full, editable schema */}
         <button
-          onClick={handleResetAll}
-          title="Reset all (clears everything)"
-          className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-error/10 transition-colors"
+          onClick={handleStop}
+          disabled={!active}
+          title="Stop replay"
+          aria-label="Stop replay"
+          className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-[rgba(0,0,0,0.05)] disabled:opacity-30 transition-colors"
         >
-          <svg className="w-4 h-4 text-error/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-            />
+          <svg className="w-3.5 h-3.5 text-[#8B7355]" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+            <rect x="4" y="4" width="12" height="12" rx="2" />
           </svg>
         </button>
 
@@ -132,10 +108,10 @@ export function CanvasControls() {
           </div>
           <div className="flex justify-between mt-1.5">
             <span className="text-[12px] text-[#8B7355]">
-              Step {currentBuildStep} / {totalSteps}
+              {active ? `Step ${currentBuildStep} / ${totalSteps}` : "Replay build"}
             </span>
             <span className="text-[12px] text-[#8B7355]">
-              {Math.round(progress)}%
+              {active ? `${Math.round(progress)}% · editing paused` : `${totalSteps} steps`}
             </span>
           </div>
         </div>

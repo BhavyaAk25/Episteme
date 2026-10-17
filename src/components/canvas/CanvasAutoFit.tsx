@@ -3,50 +3,50 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useReactFlow, type FitViewOptions } from "@xyflow/react";
 import { useCanvasStore } from "@/store/useCanvasStore";
-import { useProjectStore } from "@/store/useProjectStore";
 import { useUIStore } from "@/store/useUIStore";
 
-// Leave room at the bottom for the playback bar, minimap and zoom controls
-// so they never sit on top of tables after a fit.
+// Leave room for the toolbar (top) and the replay bar, minimap and zoom
+// controls (bottom) so they never sit on top of tables after a fit.
 export const CANVAS_FIT_OPTIONS: FitViewOptions = {
-  padding: { top: "40px", right: "48px", bottom: "150px", left: "48px" },
+  padding: { top: "72px", right: "48px", bottom: "150px", left: "48px" },
   maxZoom: 1.1,
 };
 
 const PANEL_ANIMATION_MS = 350;
+const MEASURE_DELAY_MS = 80;
 
 /**
- * Re-fits the diagram when a new schema appears, when the build replay
- * finishes, and when the sidebar or results drawer changes the canvas size.
- * Must be rendered inside <ReactFlow>.
+ * Re-fits the diagram when asked (new schema, tidy up) and when the sidebar
+ * or results drawer changes the canvas size. Must be inside <ReactFlow>.
  */
 export function CanvasAutoFit() {
   const { fitView } = useReactFlow();
-  const nodeSignature = useCanvasStore((state) => state.nodes.map((node) => node.id).join("|"));
-  const isPlaying = useProjectStore((state) => state.isPlaying);
+  const fitRequest = useCanvasStore((state) => state.fitRequest);
+  const focusRequest = useCanvasStore((state) => state.focusRequest);
   const sidebarOpen = useUIStore((state) => state.sidebarOpen);
   const drawerOpen = useUIStore((state) => state.drawerOpen);
   const fitOptions = useMemo(() => ({ ...CANVAS_FIT_OPTIONS, duration: 300 }), []);
-  const isFirstRun = useRef(true);
+  const isFirstPanelRun = useRef(true);
 
-  // New schema (or end of replay): fit once nodes have been measured.
+  // Wait a moment so newly rendered nodes are measured before fitting.
   useEffect(() => {
-    if (!nodeSignature || isPlaying) return;
-    const frame = window.requestAnimationFrame(() => {
-      void fitView(fitOptions);
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [nodeSignature, isPlaying, fitView, fitOptions]);
+    if (fitRequest === 0) return;
+    const timer = window.setTimeout(() => void fitView(fitOptions), MEASURE_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [fitRequest, fitView, fitOptions]);
 
-  // Canvas resized by a panel: refit after the panel animation finishes.
+  // Bring one table into view (e.g. picked from the sidebar).
   useEffect(() => {
-    if (isFirstRun.current) {
-      isFirstRun.current = false;
+    if (!focusRequest) return;
+    void fitView({ nodes: [{ id: focusRequest.nodeId }], maxZoom: 1, padding: 0.6, duration: 300 });
+  }, [focusRequest, fitView]);
+
+  useEffect(() => {
+    if (isFirstPanelRun.current) {
+      isFirstPanelRun.current = false;
       return;
     }
-    const timer = window.setTimeout(() => {
-      void fitView(fitOptions);
-    }, PANEL_ANIMATION_MS);
+    const timer = window.setTimeout(() => void fitView(fitOptions), PANEL_ANIMATION_MS);
     return () => window.clearTimeout(timer);
   }, [sidebarOpen, drawerOpen, fitView, fitOptions]);
 
