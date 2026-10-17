@@ -9,7 +9,7 @@ const SPEEDS: PlaybackSpeed[] = [0.5, 1, 2, 5];
 
 /** Replay of how the current schema is built, step by step. Never edits the schema. */
 export function CanvasControls() {
-  const { total: totalSteps, active, isPlaying, currentBuildStep } = useReplayView();
+  const { total: totalSteps, active, isPlaying, currentBuildStep, previewing } = useReplayView();
   const { setIsPlaying, setCurrentBuildStep } = useProjectStore();
   const { playbackSpeed, setPlaybackSpeed } = useUIStore();
 
@@ -35,7 +35,7 @@ export function CanvasControls() {
     setCurrentBuildStep(0);
   };
 
-  if (totalSteps === 0) {
+  if (totalSteps === 0 || previewing) {
     return null;
   }
 

@@ -224,3 +224,65 @@ export type Ontology = z.infer<typeof OntologySchema>;
 export type ERD = z.infer<typeof ERDSchema>;
 export type GenerationResponse = z.infer<typeof GenerationResponseSchema>;
 export type AutoFixResponse = z.infer<typeof AutoFixResponseSchema>;
+
+// AI edit operations. Unknown or malformed operations are dropped.
+const optionalText = z.string().nullish().transform((v) => (v === null || v === undefined || v === "" ? undefined : v));
+const optionalFlag = z
+  .union([z.boolean(), z.string()])
+  .nullish()
+  .transform((v) => (typeof v === "boolean" ? v : v === "true" ? true : v === "false" ? false : undefined));
+const columnSpec = z.object({
+  name: z.string().min(1),
+  type: optionalText,
+  nullable: optionalFlag,
+  primary_key: optionalFlag,
+  unique: optionalFlag,
+  default: z.union([z.string(), z.number(), z.boolean()]).nullish().transform((v) => (v === null || v === undefined ? null : String(v))),
+});
+const onDeleteValue = z
+  .string()
+  .nullish()
+  .transform((raw) => {
+    const key = raw?.trim().toUpperCase().replace(/[\s-]+/g, "_");
+    return key === "CASCADE" || key === "SET_NULL" || key === "RESTRICT" || key === "NO_ACTION" ? key : undefined;
+  });
+
+const EditOpSchema = z.discriminatedUnion("op", [
+  z.object({ op: z.literal("add_table"), table: z.string().min(1), columns: z.array(columnSpec.nullable().catch(null)).transform((cols) => cols.filter((c): c is z.output<typeof columnSpec> => c !== null)) }),
+  z.object({ op: z.literal("drop_table"), table: z.string().min(1) }),
+  z.object({ op: z.literal("rename_table"), table: z.string().min(1), new_name: z.string().min(1) }),
+  z.object({ op: z.literal("add_column"), table: z.string().min(1), column: columnSpec }),
+  z.object({ op: z.literal("drop_column"), table: z.string().min(1), column: z.string().min(1) }),
+  z.object({
+    op: z.literal("alter_column"),
+    table: z.string().min(1),
+    column: z.string().min(1),
+    new_name: optionalText,
+    type: optionalText,
+    nullable: optionalFlag,
+    unique: optionalFlag,
+    primary_key: optionalFlag,
+    default: z.union([z.string(), z.number(), z.boolean()]).nullish().transform((v) => (v === undefined ? undefined : v === null ? null : String(v))),
+  }),
+  z.object({
+    op: z.literal("add_foreign_key"),
+    from_table: z.string().min(1),
+    from_column: optionalText,
+    to_table: z.string().min(1),
+    to_column: optionalText,
+    required: optionalFlag,
+    on_delete: onDeleteValue,
+    one_to_one: optionalFlag,
+  }),
+  z.object({ op: z.literal("drop_foreign_key"), from_table: z.string().min(1), from_column: z.string().min(1) }),
+  z.object({ op: z.literal("add_index"), table: z.string().min(1), columns: z.array(z.string()).min(1), unique: optionalFlag }),
+  z.object({ op: z.literal("add_check"), table: z.string().min(1), expression: z.string().min(1) }),
+]);
+
+export const EditResponseSchema = z.object({
+  summary: z.string().nullish().transform((v) => v ?? ""),
+  operations: z
+    .array(EditOpSchema.nullable().catch(null))
+    .nullish()
+    .transform((ops) => (ops ?? []).filter((op): op is z.output<typeof EditOpSchema> => op !== null)),
+});

@@ -14,6 +14,7 @@ import { useProjectStore } from "@/store/useProjectStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
 import { useErdStore } from "@/store/useErdStore";
 import { useSimulationStore } from "@/store/useSimulationStore";
+import { useProjectsStore } from "@/store/useProjectsStore";
 import { layoutErd } from "@/lib/erd/layout";
 import type { ERD } from "@/types/erd";
 
@@ -62,9 +63,33 @@ export default function Home() {
         useErdStore.getState().loadErd(erd, positions, { resetHistory: true });
         useCanvasStore.getState().requestFit();
       }
+
+      await Promise.resolve(useProjectsStore.persist.rehydrate());
+      if (!cancelled) await useProjectsStore.getState().init();
     });
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  // Autosave the open project to IndexedDB shortly after any change.
+  useEffect(() => {
+    let timer: number | undefined;
+    const schedule = () => {
+      if (!useProjectsStore.getState().ready) return;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => void useProjectsStore.getState().saveCurrent(), 800);
+    };
+    const unsubscribeErd = useErdStore.subscribe((state, previous) => {
+      if (state.erd !== previous.erd || state.positions !== previous.positions) schedule();
+    });
+    const unsubscribeProject = useProjectStore.subscribe((state, previous) => {
+      if (state.prompt !== previous.prompt || state.ontology !== previous.ontology) schedule();
+    });
+    return () => {
+      window.clearTimeout(timer);
+      unsubscribeErd();
+      unsubscribeProject();
     };
   }, []);
 

@@ -254,6 +254,53 @@ export function addTable(erd: ERD): EditResult<{ tableId: string }> {
   return { ok: true, erd: normalizeErd({ ...erd, tables: [...erd.tables, table] }), tableId };
 }
 
+export interface NewColumnSpec {
+  name: string;
+  type?: string;
+  nullable?: boolean;
+  primaryKey?: boolean;
+  defaultValue?: string | null;
+}
+
+/** Create a named table with columns. Adds `id SERIAL` if no primary key is given. */
+export function createTable(
+  erd: ERD,
+  rawName: string,
+  columnSpecs: NewColumnSpec[],
+  position = erd.tables.length
+): EditResult<{ tableId: string }> {
+  const name = rawName.trim();
+  const invalid = validateIdentifier(name, "table");
+  if (invalid) return { ok: false, error: invalid };
+  if (erd.tables.some((t) => t.name === name)) return { ok: false, error: `A table named "${name}" already exists.` };
+
+  const columns: Column[] = [];
+  for (const spec of columnSpecs) {
+    const columnName = spec.name.trim();
+    const columnInvalid = validateIdentifier(columnName, "column");
+    if (columnInvalid) return { ok: false, error: `${name}.${columnName}: ${columnInvalid}` };
+    if (columns.some((c) => c.name === columnName)) continue;
+    columns.push({
+      name: columnName,
+      dataType: spec.type?.trim() || "TEXT",
+      nullable: spec.primaryKey ? false : spec.nullable ?? true,
+      defaultValue: spec.defaultValue?.trim() || null,
+      isPrimaryKey: Boolean(spec.primaryKey),
+      isForeignKey: false,
+      referencesTable: null,
+      referencesColumn: null,
+    });
+  }
+  if (!columns.some((c) => c.isPrimaryKey)) {
+    columns.unshift({ name: "id", dataType: "SERIAL", nullable: false, defaultValue: null, isPrimaryKey: true, isForeignKey: false, referencesTable: null, referencesColumn: null });
+  }
+
+  const tableId = randomId("tbl");
+  const tables = [...erd.tables];
+  tables.splice(position, 0, { id: tableId, name, objectTypeId: tableId, columns, constraints: [], indexes: [] });
+  return { ok: true, erd: normalizeErd({ ...erd, tables }), tableId };
+}
+
 export function renameTable(erd: ERD, tableId: string, rawName: string): EditResult {
   const table = findTable(erd, tableId);
   if (!table) return { ok: false, error: "Table not found." };

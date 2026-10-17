@@ -7,6 +7,7 @@ import { useSimulationStore } from "@/store/useSimulationStore";
 import { useUIStore } from "@/store/useUIStore";
 import { useErdStore } from "@/store/useErdStore";
 import { PhaseProgress } from "./PhaseProgress";
+import { ProjectSwitcher } from "@/components/projects/ProjectSwitcher";
 import { generateSchema } from "@/lib/actions/generateSchema";
 import { MAX_PROMPT_LENGTH } from "@/lib/limits";
 import { runSimulation } from "@/lib/simulation/testRunner";
@@ -277,10 +278,10 @@ export function TopBar() {
   const showStatusRow = Boolean(status) || Boolean(selectedTemplateLabel) || Boolean(erd);
 
   return (
-    <header className="bg-surface/94 backdrop-blur border-b border-border px-4 md:px-6 pt-[calc(env(safe-area-inset-top,0px)+12px)] shadow-[0_6px_18px_rgba(86,61,38,0.08)]">
+    <header className="relative z-40 bg-surface/94 backdrop-blur border-b border-border px-4 md:px-6 pt-[calc(env(safe-area-inset-top,0px)+12px)] shadow-[0_6px_18px_rgba(86,61,38,0.08)]">
       <div className="min-h-[92px] flex items-center">
         <div className="flex items-center gap-4 w-full min-w-0">
-          <div className="flex items-center gap-2.5 shrink-0 min-w-[152px]">
+          <div className="flex items-center gap-2.5 shrink-0">
             <div className="w-10 h-10 flex items-center justify-center">
               <Image
                 src="/brand/episteme-mark.svg"
@@ -290,10 +291,11 @@ export function TopBar() {
                 className="w-10 h-10 object-contain"
               />
             </div>
-            <span className="font-display text-[2rem] leading-none tracking-tight text-foreground hidden sm:block">
+            <span className="font-display text-[1.6rem] leading-none tracking-tight text-foreground hidden lg:block">
               Episteme
             </span>
           </div>
+          <ProjectSwitcher />
 
           <div className="flex-1 min-w-0">
             <input

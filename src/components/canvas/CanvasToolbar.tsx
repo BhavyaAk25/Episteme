@@ -7,6 +7,7 @@ import { useErdStore, undoErd, redoErd } from "@/store/useErdStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
 import { useUIStore } from "@/store/useUIStore";
 import { layoutErd } from "@/lib/erd/layout";
+import { HistoryPanel } from "@/components/projects/HistoryPanel";
 
 const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 const mod = isMac ? "⌘" : "Ctrl+";
@@ -76,6 +77,7 @@ export function CanvasToolbar({ disabled }: { disabled: boolean }) {
   const canRedo = useStore(useErdStore.temporal, (state) => state.futureStates.length > 0);
   const hasTables = useErdStore((state) => (state.erd?.tables.length ?? 0) > 0);
   const [tidying, setTidying] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const handleAddTable = useCallback(() => {
     const pane = document.querySelector(".react-flow")?.getBoundingClientRect();
@@ -136,7 +138,15 @@ export function CanvasToolbar({ disabled }: { disabled: boolean }) {
           </svg>
           {tidying ? "Arranging…" : "Tidy up"}
         </ToolButton>
+        <span className="w-px h-5 bg-border mx-1" />
+        <ToolButton onClick={() => setHistoryOpen(!historyOpen)} disabled={disabled} title="Version history">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 2M3.05 11a9 9 0 11.5 4M3 4v5h5" />
+          </svg>
+          History
+        </ToolButton>
       </div>
+      {historyOpen && !disabled && <HistoryPanel onClose={() => setHistoryOpen(false)} />}
     </Panel>
   );
 }

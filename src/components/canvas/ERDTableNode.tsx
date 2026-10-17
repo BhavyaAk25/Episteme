@@ -44,12 +44,25 @@ function ERDTableNodeComponent({ data, selected }: NodeProps) {
 
   return (
     <div
-      className={`erd-node bg-node rounded-[10px] min-w-[280px] border-[1.5px] transition-shadow ${
-        selected
-          ? "border-[#2f6eb8] shadow-[0_0_0_3px_rgba(47,110,184,0.18)]"
-          : "border-[rgba(0,0,0,0.12)] hover:border-[rgba(0,0,0,0.22)] shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
+      className={`erd-node relative bg-node rounded-[10px] min-w-[280px] border-[1.5px] transition-shadow ${
+        nodeData.diff === "added"
+          ? "border-[#2E7D32] shadow-[0_0_0_3px_rgba(46,125,50,0.18)]"
+          : nodeData.diff === "changed"
+            ? "border-[#C77D0A] shadow-[0_0_0_3px_rgba(199,125,10,0.18)]"
+            : selected
+              ? "border-[#2f6eb8] shadow-[0_0_0_3px_rgba(47,110,184,0.18)]"
+              : "border-[rgba(0,0,0,0.12)] hover:border-[rgba(0,0,0,0.22)] shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
       }`}
     >
+      {nodeData.diff && (
+        <span
+          className={`absolute -top-2.5 right-3 px-1.5 py-px rounded text-[10px] font-semibold text-white ${
+            nodeData.diff === "added" ? "bg-[#2E7D32]" : "bg-[#C77D0A]"
+          }`}
+        >
+          {nodeData.diff === "added" ? "New" : "Changed"}
+        </span>
+      )}
       <div
         className="rounded-t-[9px] px-3.5 py-2.5 border-b border-[rgba(0,0,0,0.08)] flex items-center gap-2"
         style={{ background: "linear-gradient(135deg, #f6ebde 0%, #f0e1cc 100%)" }}
