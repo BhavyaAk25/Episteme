@@ -15,6 +15,18 @@
   --accent-purple: #7d59a5;
   --border: #ddcdb6;
   --border-hover: #c9b496;
+  --bg-elevated: #ffffff;
+  --brand: #b8976a;
+  --pill: #ede3d3;
+  --node-header-from: #f6ebde;
+  --node-header-to: #f0e1cc;
+  --edge: #a88a5c;
+  --edge-selected: #2f6eb8;
+  --dots: rgba(0, 0, 0, 0.06);
+  --minimap-node: #d4c5a9;
+  --minimap-mask: rgba(244, 233, 215, 0.65);
+  --page-gradient: radial-gradient(circle at 10% -10%, #fff4df 0%, #f6efe5 40%, #f4ebdf 100%);
+  color-scheme: light;
 
   /* UI scale tokens */
   --space-1: 4px;
@@ -38,6 +50,69 @@
   --foreground: var(--text-primary);
 }
 
+
+/* Dark theme: follows the system unless the user picked light or dark. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg-canvas: #17140f;
+    --bg-surface: #1f1b15;
+    --bg-node: #25211a;
+    --bg-node-header: #2e281f;
+    --text-primary: #ede4d6;
+    --text-secondary: #a8998a;
+    --accent-blue: #7aa7e0;
+    --accent-green: #5cbf8a;
+    --accent-amber: #e0a94a;
+    --accent-red: #e07a6c;
+    --accent-purple: #b996e0;
+    --border: #3a3227;
+    --border-hover: #4d4334;
+    --bg-elevated: #2a241c;
+    --brand: #c9a876;
+    --pill: #3a3227;
+    --node-header-from: #2f2920;
+    --node-header-to: #29231b;
+    --edge: #b39568;
+    --edge-selected: #7aa7e0;
+    --dots: rgba(255, 255, 255, 0.07);
+    --minimap-node: #5a4d3b;
+    --minimap-mask: rgba(23, 20, 15, 0.6);
+    --page-gradient: none;
+    --surface-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
+    --surface-shadow-soft: 0 6px 16px rgba(0, 0, 0, 0.3);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg-canvas: #17140f;
+  --bg-surface: #1f1b15;
+  --bg-node: #25211a;
+  --bg-node-header: #2e281f;
+  --text-primary: #ede4d6;
+  --text-secondary: #a8998a;
+  --accent-blue: #7aa7e0;
+  --accent-green: #5cbf8a;
+  --accent-amber: #e0a94a;
+  --accent-red: #e07a6c;
+  --accent-purple: #b996e0;
+  --border: #3a3227;
+  --border-hover: #4d4334;
+  --bg-elevated: #2a241c;
+  --brand: #c9a876;
+  --pill: #3a3227;
+  --node-header-from: #2f2920;
+  --node-header-to: #29231b;
+  --edge: #b39568;
+  --edge-selected: #7aa7e0;
+  --dots: rgba(255, 255, 255, 0.07);
+  --minimap-node: #5a4d3b;
+  --minimap-mask: rgba(23, 20, 15, 0.6);
+  --page-gradient: none;
+  --surface-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
+  --surface-shadow-soft: 0 6px 16px rgba(0, 0, 0, 0.3);
+  color-scheme: dark;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -52,6 +127,9 @@
   --color-error: var(--accent-red);
   --color-purple: var(--accent-purple);
   --color-border: var(--border);
+  --color-elevated: var(--bg-elevated);
+  --color-brand: var(--brand);
+  --color-pill: var(--pill);
   --font-sans: var(--font-ibm-plex-sans);
   --font-display: var(--font-sora);
   --font-mono: var(--font-jetbrains-mono);
@@ -69,9 +147,8 @@ html, body {
 }
 
 body {
-  background:
-    radial-gradient(circle at 10% -10%, #fff4df 0%, #f6efe5 40%, #f4ebdf 100%);
-  color: #3D3425;
+  background: var(--page-gradient), var(--bg-canvas);
+  color: var(--text-primary);
   font-family: var(--font-sans), system-ui, sans-serif;
   font-size: 13px;
   line-height: 1.5;
@@ -102,7 +179,7 @@ body {
 }
 
 .react-flow__minimap {
-  background-color: rgba(255, 252, 247, 0.9) !important;
+  background-color: var(--bg-surface) !important;
   border: 1px solid var(--border) !important;
   border-radius: 8px !important;
 }
@@ -121,6 +198,19 @@ body {
 
 .react-flow__controls-button:hover {
   background-color: var(--bg-node) !important;
+}
+
+.react-flow__minimap-node {
+  fill: var(--minimap-node) !important;
+}
+
+.react-flow__minimap-mask {
+  fill: var(--minimap-mask) !important;
+}
+
+.react-flow__edge-textwrapper,
+.react-flow__attribution {
+  color: var(--text-secondary);
 }
 
 
@@ -162,14 +252,14 @@ body {
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #8B7355;
+    color: var(--text-secondary);
     font-weight: 600;
   }
 
   .ui-ghost-btn {
-    border: 1px solid rgba(0,0,0,0.15);
+    border: 1px solid var(--border);
     border-radius: 8px;
-    background: white;
+    background: var(--bg-elevated);
     color: var(--text-primary);
     font-size: 13px;
     font-weight: 600;
@@ -184,7 +274,7 @@ body {
   .ui-primary-btn {
     border: none;
     border-radius: 8px;
-    background: #B8976A;
+    background: var(--brand);
     color: white;
     font-size: 13px;
     font-weight: 600;
@@ -203,7 +293,7 @@ body {
 
 /* Dotted grid for empty canvas state */
 .dotted-grid-bg {
-  background-image: radial-gradient(circle, rgba(0,0,0,0.06) 1px, transparent 1px);
+  background-image: radial-gradient(circle, var(--dots) 1px, transparent 1px);
   background-size: 20px 20px;
 }
 

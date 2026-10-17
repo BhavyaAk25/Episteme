@@ -197,18 +197,16 @@ export function ERDCanvas() {
       >
         <CanvasAutoFit />
         {hasSchema && <CanvasToolbar disabled={replaying} />}
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="rgba(0,0,0,0.06)" />
+        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="var(--dots)" />
         <Controls position="bottom-right" showInteractive={false} />
         {nodes.length > 1 && (
           <MiniMap
             position="bottom-left"
             pannable
             zoomable
-            nodeColor={() => "#D4C5A9"}
             nodeStrokeColor={(node) => (node.id === selectedNodeId ? "var(--accent-blue)" : "var(--border)")}
             nodeBorderRadius={4}
-            maskColor="rgba(244, 233, 215, 0.65)"
-            style={{ width: 176, height: 112 }}
+                        style={{ width: 176, height: 112 }}
           />
         )}
       </ReactFlow>
@@ -218,7 +216,7 @@ export function ERDCanvas() {
 
       {showEmptyState && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none dotted-grid-bg">
-          <div className="text-center max-w-[400px] px-6">
+          <div className={`text-center px-6 ${hasSchema ? "max-w-[400px]" : "max-w-[640px]"}`}>
             <div className="mx-auto mb-3 w-14 h-14 rounded-2xl bg-surface border border-border flex items-center justify-center">
               <svg className="w-7 h-7 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path
@@ -235,22 +233,60 @@ export function ERDCanvas() {
                 <p className="mt-1 text-[13px] text-muted">Use <strong>+ Table</strong> in the toolbar to add your first table.</p>
               </>
             ) : (
-              <>
-                <h3 className="text-[16px] font-semibold text-foreground">Design a database</h3>
-                <p className="mt-1 text-[13px] text-muted">
-                  Describe your system in the bar above and press Generate, pick a template on the left, or start from scratch.
-                </p>
-                <button
-                  onClick={() => useErdStore.getState().startBlank()}
-                  className="ui-ghost-btn mt-4 pointer-events-auto"
-                >
-                  Start with a blank canvas
-                </button>
-              </>
+              <StartOptions />
             )}
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+function StartOptions() {
+  const options: Array<{ title: string; body: string; action: () => void }> = [
+    {
+      title: "Describe it",
+      body: "Type what you're building in the bar above. The AI drafts tables and relationships.",
+      action: () => document.querySelector<HTMLInputElement>('input[aria-label="System description"]')?.focus(),
+    },
+    {
+      title: "Start from a template",
+      body: "Inventory, SaaS or e-commerce — a solid starting point you can edit.",
+      action: () => {
+        const ui = useUIStore.getState();
+        if (!ui.sidebarOpen) ui.toggleSidebar();
+      },
+    },
+    {
+      title: "Import SQL",
+      body: "Paste CREATE TABLE statements or upload a schema dump to see it as a diagram.",
+      action: () => useUIStore.getState().setImportOpen(true),
+    },
+    {
+      title: "Blank canvas",
+      body: "Add tables and draw foreign keys yourself.",
+      action: () => useErdStore.getState().startBlank(),
+    },
+  ];
+  return (
+    <>
+      <h3 className="text-[18px] font-semibold text-foreground">Design a database</h3>
+      <p className="mt-1 text-[13px] text-muted">Pick how you want to start. Everything stays in your browser.</p>
+      <div className="mt-5 grid grid-cols-2 gap-2.5 text-left pointer-events-auto">
+        {options.map((option) => (
+          <button
+            key={option.title}
+            onClick={option.action}
+            className="rounded-xl border border-border bg-surface px-4 py-3 hover:border-accent/50 hover:shadow-sm transition-all"
+          >
+            <span className="block text-[14px] font-semibold text-foreground">{option.title}</span>
+            <span className="mt-0.5 block text-[12px] text-muted leading-snug">{option.body}</span>
+          </button>
+        ))}
+      </div>
+      <p className="mt-4 text-[12px] text-muted">
+        Press <kbd className="px-1.5 py-px rounded border border-border bg-surface font-mono text-[11px]">?</kbd> for keyboard shortcuts.
+      </p>
+    </>
   );
 }

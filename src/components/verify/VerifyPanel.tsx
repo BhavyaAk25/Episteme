@@ -15,7 +15,7 @@ type Tab = "issues" | "tests" | "data";
 const SEVERITY_STYLE: Record<Severity, { dot: string; label: string }> = {
   error: { dot: "bg-error", label: "Error" },
   warning: { dot: "bg-warning", label: "Warning" },
-  info: { dot: "bg-[#7b8aa0]", label: "Suggestion" },
+  info: { dot: "bg-muted", label: "Suggestion" },
 };
 
 function IssueRow({ issue }: { issue: Issue }) {
@@ -36,7 +36,7 @@ function IssueRow({ issue }: { issue: Issue }) {
               useCanvasStore.getState().requestFocus(tableId);
               useUIStore.getState().openInspector();
             }}
-            className="h-7 px-2 rounded-md text-[11px] text-muted hover:text-foreground hover:bg-[rgba(0,0,0,0.04)]"
+            className="h-7 px-2 rounded-md text-[11px] text-muted hover:text-foreground hover:bg-foreground/[0.04]"
           >
             Show
           </button>
@@ -52,7 +52,7 @@ function IssueRow({ issue }: { issue: Issue }) {
         ) : issue.askAi ? (
           <button
             onClick={() => askAiAboutIssue(issue)}
-            className="h-7 px-2.5 rounded-md border border-border text-foreground text-[12px] font-medium hover:bg-[rgba(0,0,0,0.04)]"
+            className="h-7 px-2.5 rounded-md border border-border text-foreground text-[12px] font-medium hover:bg-foreground/[0.04]"
           >
             Ask AI to fix
           </button>
@@ -103,7 +103,7 @@ export function VerifyPanel() {
 
   return (
     <div className="shrink-0">
-      <div className="h-10 bg-[rgba(255,252,247,0.97)] border-t border-border px-4 flex items-center gap-4">
+      <div className="h-10 bg-surface/95 border-t border-border px-4 flex items-center gap-4">
         <button onClick={toggleDrawer} className="flex items-center gap-3 h-full flex-1 min-w-0 text-left" aria-expanded={drawerOpen}>
           <span className="text-[13px] font-semibold text-foreground">Checks</span>
           <span className="flex items-center gap-3 text-[12px]">
@@ -146,7 +146,7 @@ export function VerifyPanel() {
                       role="tab"
                       aria-selected={tab === key}
                       onClick={() => setTab(key)}
-                      className={`h-8 px-3 rounded-md text-[12px] font-medium ${tab === key ? "bg-[#EDE3D3] text-foreground" : "text-muted hover:text-foreground"}`}
+                      className={`h-8 px-3 rounded-md text-[12px] font-medium ${tab === key ? "bg-pill text-foreground" : "text-muted hover:text-foreground"}`}
                     >
                       {label}
                     </button>
@@ -154,14 +154,14 @@ export function VerifyPanel() {
                 </div>
                 <div className="flex items-center gap-2">
                   {tab === "issues" && fixable.length > 0 && (
-                    <button onClick={() => applyIssueFixes(fixable)} className="h-8 px-3 rounded-md bg-[#B8976A] text-white text-[12px] font-semibold">
+                    <button onClick={() => applyIssueFixes(fixable)} className="h-8 px-3 rounded-md bg-brand text-white text-[12px] font-semibold">
                       Fix all {fixable.length}
                     </button>
                   )}
                   <button
                     onClick={() => void runTests()}
                     disabled={isRunning}
-                    className="h-8 px-3 rounded-md border border-border text-[12px] font-medium text-foreground hover:bg-[rgba(0,0,0,0.04)] disabled:opacity-50"
+                    className="h-8 px-3 rounded-md border border-border text-[12px] font-medium text-foreground hover:bg-foreground/[0.04] disabled:opacity-50"
                   >
                     {isRunning ? "Running…" : run ? "Re-run tests" : "Run Postgres tests"}
                   </button>

@@ -9,11 +9,11 @@ interface StatusTagProps {
 const statusConfig: Record<Status, { label: string; className: string }> = {
   active: {
     label: "Active",
-    className: "bg-[#E8F5E9] text-[#2E7D32]",
+    className: "bg-success/15 text-success",
   },
   experimental: {
     label: "Experimental",
-    className: "bg-[#FFF3E0] text-[#E65100]",
+    className: "bg-warning/15 text-warning",
   },
   deprecated: {
     label: "Deprecated",

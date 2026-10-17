@@ -72,7 +72,7 @@ function ERDRelationEdgeComponent({
               transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
               pointerEvents: "none",
             }}
-            className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-white/95 text-[#6B5A3E] border border-[rgba(0,0,0,0.08)] shadow-sm"
+            className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-elevated/95 text-muted border border-foreground/[0.08] shadow-sm"
           >
             {edgeData.fromColumn} → {edgeData.toColumn} · ON DELETE {edgeData.onDelete.replace("_", " ")}
           </div>

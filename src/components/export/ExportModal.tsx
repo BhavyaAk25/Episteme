@@ -1,166 +1,239 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useSimulationStore } from "@/store/useSimulationStore";
 import { useUIStore } from "@/store/useUIStore";
 import { useErdStore } from "@/store/useErdStore";
+import { useCanvasStore } from "@/store/useCanvasStore";
+import { useProjectsStore } from "@/store/useProjectsStore";
 import { erdToSql } from "@/lib/ontology/transformer";
 import { reconcileOntologyWithErd, EMPTY_ONTOLOGY } from "@/lib/ontology/reconcile";
+import { erdToDrizzle, erdToMysql, erdToPrisma, erdToSqlite } from "@/lib/export/dialects";
+import { buildReportHtml } from "@/lib/export/report";
+import { exportDiagramImage } from "@/lib/export/image";
+import { buildShareUrl } from "@/lib/export/share";
+import { useIssues } from "@/lib/verify/useIssues";
 
+type FormatKey = "postgres" | "mysql" | "sqlite" | "prisma" | "drizzle" | "ontology" | "report";
+
+const FORMATS: Array<{ key: FormatKey; file: string; label: string; hint: string }> = [
+  { key: "postgres", file: "schema.postgres.sql", label: "PostgreSQL", hint: "Tested in Postgres when you run tests" },
+  { key: "mysql", file: "schema.mysql.sql", label: "MySQL 8", hint: "InnoDB, utf8mb4" },
+  { key: "sqlite", file: "schema.sqlite.sql", label: "SQLite", hint: "With foreign keys on" },
+  { key: "prisma", file: "schema.prisma", label: "Prisma", hint: "Models, relations, @@map" },
+  { key: "drizzle", file: "schema.drizzle.ts", label: "Drizzle ORM", hint: "pg-core tables" },
+  { key: "ontology", file: "ontology.json", label: "Ontology JSON", hint: "Objects, links, actions" },
+  { key: "report", file: "report.html", label: "Checks report", hint: "Issues + Postgres test results" },
+];
+
+const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "schema";
+
+function download(content: Blob, fileName: string) {
+  const url = URL.createObjectURL(content);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** Download the schema in several formats, the diagram as an image, or a share link. */
 export function ExportModal() {
   const { exportModalOpen, closeExportModal } = useUIStore();
-  const { ontology: generatedOntology, prompt } = useProjectStore();
+  const { ontology, prompt } = useProjectStore();
   const erd = useErdStore((state) => state.erd);
-  // Always export what's on the canvas, including manual edits.
-  const schemaSql = useMemo(() => (erd && erd.tables.length > 0 ? erdToSql(erd) : null), [erd]);
-  const ontology = useMemo(
-    () => (erd ? reconcileOntologyWithErd(generatedOntology ?? EMPTY_ONTOLOGY, erd) : null),
-    [erd, generatedOntology]
-  );
+  const positions = useErdStore((state) => state.positions);
   const run = useSimulationStore((state) => state.run);
-  // Report payload: failed Postgres tests are listed as incidents.
-  const results = run
-    ? {
-        totalTests: run.tests.length,
-        passedCount: run.tests.filter((t) => t.status === "pass").length,
-        failedCount: run.tests.filter((t) => t.status === "fail").length,
-        startedAt: run.startedAt,
-        completedAt: run.startedAt + run.durationMs,
-        incidents: [
-          ...run.ddlProblems.map((p, i) => ({ id: `ddl_${i}`, status: "open", rootCause: null, suggestedFix: null, testResult: { testName: `DDL${p.table ? ` (${p.table})` : ""}`, category: "schema", error: p.error } })),
-          ...run.tests.filter((t) => t.status === "fail").map((t) => ({ id: t.id, status: "open", rootCause: null, suggestedFix: null, testResult: { testName: t.title, category: t.kind, error: t.detail } })),
-        ],
-      }
-    : null;
+  const projectName = useProjectsStore((state) => state.projects.find((p) => p.id === state.currentProjectId)?.name ?? "Schema");
+  const issues = useIssues();
 
-  const [isExporting, setIsExporting] = useState(false);
-  const [includeSql, setIncludeSql] = useState(true);
-  const [includeOntology, setIncludeOntology] = useState(true);
-  const [includeReport, setIncludeReport] = useState(true);
+  const [selected, setSelected] = useState<Record<FormatKey, boolean>>({
+    postgres: true,
+    mysql: false,
+    sqlite: false,
+    prisma: true,
+    drizzle: false,
+    ontology: false,
+    report: true,
+  });
+  const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
-  const canExport = useMemo(() => {
-    return Boolean(schemaSql && ontology && !isExporting && (includeSql || includeOntology || includeReport));
-  }, [schemaSql, ontology, isExporting, includeSql, includeOntology, includeReport]);
+  const files = useMemo(() => {
+    if (!erd || erd.tables.length === 0) return null;
+    const build: Record<FormatKey, () => string> = {
+      postgres: () => `-- PostgreSQL schema generated by Episteme\n\n${erdToSql(erd)}\n`,
+      mysql: () => erdToMysql(erd),
+      sqlite: () => erdToSqlite(erd),
+      prisma: () => erdToPrisma(erd),
+      drizzle: () => erdToDrizzle(erd),
+      ontology: () => `${JSON.stringify(reconcileOntologyWithErd(ontology ?? EMPTY_ONTOLOGY, erd), null, 2)}\n`,
+      report: () => buildReportHtml({ name: projectName, prompt, erd, issues, run }),
+    };
+    return build;
+  }, [erd, ontology, projectName, prompt, issues, run]);
 
-  const handleExport = async () => {
-    if (!canExport || !schemaSql || !ontology) return;
+  const chosen = FORMATS.filter((f) => selected[f.key]);
 
+  const handleZip = async () => {
+    if (!files || chosen.length === 0) return;
+    setBusy("zip");
     setError(null);
-    setIsExporting(true);
-
     try {
-      const response = await fetch("/api/export", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          schemaSql,
-          ontology,
-          prompt,
-          simulationResults: results,
-          includeSql,
-          includeOntology,
-          includeReport,
-        }),
-      });
-
-      if (!response.ok) {
-        const payload = await response.json();
-        throw new Error(payload.error || "Export request failed");
+      if (chosen.length === 1) {
+        download(new Blob([files[chosen[0].key]()], { type: "text/plain" }), `${slug(projectName)}.${chosen[0].file}`);
+      } else {
+        const { default: JSZip } = await import("jszip");
+        const zip = new JSZip();
+        for (const format of chosen) zip.file(format.file, files[format.key]());
+        download(await zip.generateAsync({ type: "blob" }), `${slug(projectName)}.zip`);
       }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `episteme_export_${Date.now()}.zip`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
-
-      closeExportModal();
-    } catch (exportError) {
-      setError(exportError instanceof Error ? exportError.message : "Export failed");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Export failed.");
     } finally {
-      setIsExporting(false);
+      setBusy(null);
     }
   };
 
-  if (!exportModalOpen) return null;
+  const handleImage = async (format: "png" | "svg") => {
+    setBusy(format);
+    setError(null);
+    try {
+      await exportDiagramImage(useCanvasStore.getState().nodes, format, slug(projectName));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't render the diagram.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!erd) return;
+    const url = buildShareUrl({ name: projectName, prompt, erd, positions });
+    setShareUrl(url);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  const close = () => {
+    setShareUrl(null);
+    setError(null);
+    closeExportModal();
+  };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[rgba(56,40,22,0.24)] backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-lg rounded-xl border border-border bg-surface p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">Export Bundle</h2>
-            <p className="mt-1 text-sm text-muted">
-              Download production-ready artifacts as a single zip package.
-            </p>
-          </div>
-          <button
-            onClick={closeExportModal}
-            className="h-8 w-8 rounded-md border border-border text-muted hover:text-foreground hover:bg-node transition-colors"
-            aria-label="Close export modal"
+    <AnimatePresence>
+      {exportModalOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(30,22,12,0.35)] backdrop-blur-sm p-4"
+          onClick={close}
+        >
+          <motion.div
+            initial={{ scale: 0.97, y: 8 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.97, y: 8 }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Export"
+            className="w-[560px] max-w-full max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-surface shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
           >
-            ×
-          </button>
-        </div>
+            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+              <div>
+                <h2 className="text-[16px] font-semibold text-foreground">Export “{projectName}”</h2>
+                <p className="text-[12px] text-muted">Every format is generated from the same schema as the diagram.</p>
+              </div>
+              <button onClick={close} aria-label="Close" className="w-8 h-8 rounded-lg text-muted hover:text-foreground hover:bg-foreground/5">×</button>
+            </div>
 
-        <div className="mt-4 space-y-3">
-          <label className="flex items-center justify-between rounded-lg border border-border bg-canvas px-3 py-2">
-            <span className="text-sm text-foreground font-medium">schema.sql</span>
-            <input
-              type="checkbox"
-              checked={includeSql}
-              onChange={(event) => setIncludeSql(event.target.checked)}
-            />
-          </label>
+            {!files ? (
+              <p className="p-5 text-[13px] text-muted">Add at least one table to export.</p>
+            ) : (
+              <div className="p-5 space-y-6">
+                <section>
+                  <h3 className="ui-section-title mb-2">Code</h3>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {FORMATS.map((format) => (
+                      <label
+                        key={format.key}
+                        className={`flex items-start gap-2 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${
+                          selected[format.key] ? "border-accent/40 bg-accent/5" : "border-border hover:bg-foreground/[0.03]"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="mt-0.5"
+                          checked={selected[format.key]}
+                          onChange={(e) => setSelected({ ...selected, [format.key]: e.target.checked })}
+                        />
+                        <span>
+                          <span className="block text-[13px] text-foreground font-medium">{format.label}</span>
+                          <span className="block text-[11px] text-muted">{format.hint}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <p className="text-[11px] text-muted">
+                      {run ? "The report includes your latest Postgres test run." : "Tip: run the Postgres tests first to include results in the report."}
+                    </p>
+                    <button onClick={handleZip} disabled={chosen.length === 0 || busy !== null} className="ui-primary-btn disabled:opacity-40 shrink-0">
+                      {busy === "zip" ? "Preparing…" : chosen.length === 1 ? `Download ${chosen[0].label}` : `Download ${chosen.length} files (.zip)`}
+                    </button>
+                  </div>
+                </section>
 
-          <label className="flex items-center justify-between rounded-lg border border-border bg-canvas px-3 py-2">
-            <span className="text-sm text-foreground font-medium">ontology.json</span>
-            <input
-              type="checkbox"
-              checked={includeOntology}
-              onChange={(event) => setIncludeOntology(event.target.checked)}
-            />
-          </label>
+                <section>
+                  <h3 className="ui-section-title mb-2">Diagram</h3>
+                  <div className="flex gap-2">
+                    <button onClick={() => void handleImage("png")} disabled={busy !== null} className="ui-ghost-btn disabled:opacity-40">
+                      {busy === "png" ? "Rendering…" : "PNG image"}
+                    </button>
+                    <button onClick={() => void handleImage("svg")} disabled={busy !== null} className="ui-ghost-btn disabled:opacity-40">
+                      {busy === "svg" ? "Rendering…" : "SVG (vector)"}
+                    </button>
+                  </div>
+                </section>
 
-          <label className="flex items-center justify-between rounded-lg border border-border bg-canvas px-3 py-2">
-            <span className="text-sm text-foreground font-medium">verification_report.html</span>
-            <input
-              type="checkbox"
-              checked={includeReport}
-              onChange={(event) => setIncludeReport(event.target.checked)}
-            />
-          </label>
-        </div>
+                <section>
+                  <h3 className="ui-section-title mb-2">Share</h3>
+                  <p className="text-[12px] text-muted mb-2">
+                    A link with the whole schema inside it. Nothing is uploaded; whoever opens it gets their own editable copy.
+                  </p>
+                  <div className="flex gap-2">
+                    <button onClick={() => void handleShare()} className="ui-ghost-btn">
+                      {copied ? "Link copied ✓" : "Copy share link"}
+                    </button>
+                    {shareUrl && (
+                      <input
+                        readOnly
+                        value={shareUrl}
+                        onFocus={(e) => e.target.select()}
+                        aria-label="Share link"
+                        className="flex-1 min-w-0 h-9 px-2 rounded-md border border-border bg-canvas text-[11px] font-mono text-muted"
+                      />
+                    )}
+                  </div>
+                </section>
 
-        {error && (
-          <p className="mt-4 rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-xs text-error">
-            {error}
-          </p>
-        )}
-
-        <div className="mt-5 flex items-center justify-end gap-2">
-          <button
-            onClick={closeExportModal}
-            className="px-4 h-9 rounded-lg border border-border text-sm text-foreground hover:bg-node transition-colors"
-            disabled={isExporting}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleExport}
-            disabled={!canExport}
-            className="px-4 h-9 rounded-lg bg-accent text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-accent/90 transition-colors"
-          >
-            {isExporting ? "Exporting..." : "Download Zip"}
-          </button>
-        </div>
-      </div>
-    </div>
+                {error && <p className="text-[13px] text-error">{error}</p>}
+              </div>
+            )}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

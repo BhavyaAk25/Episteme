@@ -23,8 +23,8 @@ const sora = Sora({
 });
 
 export const metadata: Metadata = {
-  title: "Episteme — AI-Powered Database System Builder",
-  description: "Turn plain-English requirements into verified database systems with Gemini 3",
+  title: "Episteme — AI database designer",
+  description: "Design databases from plain English: an editable ERD with real Postgres verification, AI edits, and exports to SQL, Prisma and Drizzle.",
   keywords: ["database", "schema", "ontology", "ERD", "Gemini", "AI"],
   icons: {
     icon: [
@@ -42,7 +42,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Apply a saved light/dark choice before first paint (no flash). */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem("episteme-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`,
+          }}
+        />
+      </head>
       <body
         className={`${jetbrainsMono.variable} ${ibmPlexSans.variable} ${sora.variable} antialiased`}
       >

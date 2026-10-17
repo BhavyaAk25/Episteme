@@ -93,6 +93,8 @@ interface ProjectsState {
   init: () => Promise<void>;
   saveCurrent: () => Promise<void>;
   createProject: () => Promise<void>;
+  /** Create a project from an existing schema (share links, SQL import). */
+  createProjectFrom: (args: { name: string; prompt?: string; erd: ERD; positions: Record<string, XY>; versionLabel: string }) => Promise<void>;
   switchProject: (id: string) => Promise<void>;
   renameProject: (id: string, name: string) => void;
   deleteProject: (id: string) => Promise<void>;
@@ -164,6 +166,30 @@ export const useProjectsStore = create<ProjectsState>()(
         });
         applyData(undefined);
         await get().saveCurrent();
+      },
+
+      createProjectFrom: async ({ name, prompt, erd, positions, versionLabel }) => {
+        await get().saveCurrent();
+        const id = newId("prj");
+        const now = Date.now();
+        set({
+          projects: [...get().projects, { id, name: name.slice(0, 60), createdAt: now, updatedAt: now, tableCount: erd.tables.length }],
+          currentProjectId: id,
+          versions: [],
+        });
+        applyData({
+          erd,
+          positions,
+          prompt: prompt ?? "",
+          templateId: null,
+          plan: null,
+          ontology: null,
+          generationMode: null,
+          fallbackDomain: null,
+          generationWarning: null,
+        });
+        await get().saveCurrent();
+        await get().addVersion(versionLabel);
       },
 
       switchProject: async (id) => {

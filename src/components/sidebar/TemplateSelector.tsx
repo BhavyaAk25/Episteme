@@ -54,8 +54,8 @@ export function TemplateSelector() {
               onClick={() => applyTemplate(template)}
               className={`w-full border rounded-lg px-3 py-2.5 flex flex-col items-start text-left gap-0.5 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                 isActive
-                  ? "border-[#c4a574] bg-white/80"
-                  : "border-border/70 bg-white/55 hover:bg-white/80 hover:border-[#c4a574]"
+                  ? "border-brand bg-elevated/80"
+                  : "border-border/70 bg-elevated/55 hover:bg-elevated/80 hover:border-brand"
               }`}
             >
               <div className={`text-[13px] text-foreground leading-tight ${isActive ? "font-semibold" : "font-medium"}`}>

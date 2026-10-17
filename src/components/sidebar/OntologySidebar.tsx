@@ -25,7 +25,7 @@ export function OntologySidebar() {
       {/* Toggle button — positioned at right edge of sidebar, vertically centered */}
       <button
         onClick={toggleSidebar}
-        className="absolute top-1/2 -translate-y-1/2 z-20 bg-white border border-[#d4c5b0] rounded-r-lg p-2 hover:bg-[#faf8f4] transition-all shadow-md"
+        className="absolute top-1/2 -translate-y-1/2 z-20 bg-elevated border border-border rounded-r-lg p-2 hover:bg-pill transition-all shadow-md"
         style={{
           left: sidebarOpen ? sidebarWidth : 0,
           transition: "left 300ms ease-in-out",
@@ -33,7 +33,7 @@ export function OntologySidebar() {
         title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
       >
         <svg
-          className={`w-4 h-4 text-[#8b7355] transition-transform ${
+          className={`w-4 h-4 text-muted transition-transform ${
             sidebarOpen ? "" : "rotate-180"
           }`}
           fill="none"
@@ -94,8 +94,8 @@ export function OntologySidebar() {
                               onClick={() => handleTableClick(table.id)}
                               className={`w-full text-left px-3 py-2 rounded-lg border transition-colors ${
                                 isSelected
-                                  ? "bg-white border-[#2f6eb8]/40"
-                                  : "bg-white/60 border-transparent hover:bg-white hover:border-border/60"
+                                  ? "bg-elevated border-accent/40"
+                                  : "bg-elevated/60 border-transparent hover:bg-elevated hover:border-border/60"
                               }`}
                             >
                               <div className="flex items-center justify-between gap-2">
@@ -135,7 +135,7 @@ export function OntologySidebar() {
                     <SidebarLoadingSkeleton />
                   </div>
                 ) : (
-                  <div className="mt-8 text-[#8b7355]">
+                  <div className="mt-8 text-muted">
                     <p>No ontology yet.</p>
                     <p className="mt-1 text-sm">
                       Enter a system description and click Generate.

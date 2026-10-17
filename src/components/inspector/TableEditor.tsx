@@ -14,7 +14,7 @@ function ColumnRow({ table, index }: { table: Table; index: number }) {
   const unique = isColumnUnique(table, column.name);
 
   return (
-    <div className="group rounded-lg border border-transparent hover:border-border/70 hover:bg-white/60 px-1.5 py-1.5 transition-colors">
+    <div className="group rounded-lg border border-transparent hover:border-border/70 hover:bg-elevated/60 px-1.5 py-1.5 transition-colors">
       <div className="flex items-center gap-1">
         <CommitInput
           value={column.name}
@@ -26,7 +26,7 @@ function ColumnRow({ table, index }: { table: Table; index: number }) {
           value={column.dataType}
           list="erd-column-types"
           ariaLabel={`Type of ${column.name}`}
-          className="w-[118px] font-mono text-[11px] text-[#8B7355] text-right"
+          className="w-[118px] font-mono text-[11px] text-muted text-right"
           onCommit={(dataType) => updateColumn(table.id, column.name, { dataType })}
         />
         <div className="flex items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
@@ -188,8 +188,8 @@ export function TableEditor({ table }: { table: Table }) {
       <SectionHeader title={`Constraints (${extraConstraints.length})`} />
       <div className="space-y-1">
         {extraConstraints.map(({ constraint, index }) => (
-          <div key={index} className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-[rgba(0,0,0,0.025)]">
-            <span className={`text-[10px] font-mono font-semibold ${constraint.type === "CHECK" ? "text-[#B45309]" : "text-[#7B1FA2]"}`}>
+          <div key={index} className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-foreground/[0.025]">
+            <span className={`text-[10px] font-mono font-semibold ${constraint.type === "CHECK" ? "text-warning" : "text-purple"}`}>
               {constraint.type}
             </span>
             <span className="flex-1 min-w-0 truncate font-mono text-[11px] text-foreground">
@@ -218,7 +218,7 @@ export function TableEditor({ table }: { table: Table }) {
             placeholder="CHECK, e.g. price >= 0"
             aria-label="New CHECK constraint"
             spellCheck={false}
-            className="flex-1 min-w-0 h-7 px-2 rounded-md border border-border bg-white/70 font-mono text-[11px] focus:outline-none focus:border-accent"
+            className="flex-1 min-w-0 h-7 px-2 rounded-md border border-border bg-elevated/70 font-mono text-[11px] focus:outline-none focus:border-accent"
           />
           <SmallButton type="submit" tone="primary" disabled={!checkDraft.trim()}>
             Add
@@ -229,11 +229,11 @@ export function TableEditor({ table }: { table: Table }) {
       <SectionHeader title={`Indexes (${table.indexes.length})`} />
       <div className="space-y-1">
         {table.indexes.map((index) => (
-          <div key={index.name} className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-[rgba(0,0,0,0.025)]">
+          <div key={index.name} className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-foreground/[0.025]">
             <span className="flex-1 min-w-0 truncate font-mono text-[11px] text-foreground" title={index.name}>
               ({index.columns.join(", ")})
             </span>
-            {index.unique && <span className="text-[10px] font-mono font-semibold text-[#7B1FA2]">UNIQUE</span>}
+            {index.unique && <span className="text-[10px] font-mono font-semibold text-purple">UNIQUE</span>}
             <button
               type="button"
               onClick={() => removeIndex(table.id, index.name)}

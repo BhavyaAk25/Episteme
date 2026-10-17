@@ -62,7 +62,7 @@ export function CommitInput({
       aria-label={ariaLabel}
       autoFocus={autoFocus}
       spellCheck={false}
-      className={`min-w-0 h-8 px-2 rounded-md border border-transparent bg-transparent hover:border-border focus:border-accent focus:bg-white focus:outline-none focus:ring-2 focus:ring-accent/15 transition-colors ${className}`}
+      className={`min-w-0 h-8 px-2 rounded-md border border-transparent bg-transparent hover:border-border focus:border-accent focus:bg-elevated focus:outline-none focus:ring-2 focus:ring-accent/15 transition-colors ${className}`}
     />
   );
 }
@@ -84,9 +84,9 @@ export function FlagToggle({
   tone?: "neutral" | "key" | "unique" | "danger";
 }) {
   const activeTone = {
-    neutral: "bg-[#EDE3D3] text-foreground border-[#D8C6A8]",
-    key: "bg-[#FFF3D6] text-[#9A6B00] border-[#EBCB7A]",
-    unique: "bg-[#F3E5F5] text-[#7B1FA2] border-[#DDB8E3]",
+    neutral: "bg-pill text-foreground border-border-hover",
+    key: "bg-warning/15 text-warning border-warning/40",
+    unique: "bg-purple/15 text-purple border-purple/40",
     danger: "bg-error/10 text-error border-error/30",
   }[tone];
   return (
@@ -131,7 +131,7 @@ export function SmallButton({
   type?: "button" | "submit";
 }) {
   const toneClass = {
-    neutral: "text-foreground border-border hover:bg-[rgba(0,0,0,0.04)]",
+    neutral: "text-foreground border-border hover:bg-foreground/[0.04]",
     danger: "text-error border-error/30 hover:bg-error/10",
     primary: "text-accent border-accent/30 hover:bg-accent/10",
   }[tone];

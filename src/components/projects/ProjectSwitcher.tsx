@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useProjectsStore } from "@/store/useProjectsStore";
 import { useProjectStore } from "@/store/useProjectStore";
+import { useUIStore } from "@/store/useUIStore";
 
 function timeAgo(timestamp: number): string {
   const seconds = Math.round((Date.now() - timestamp) / 1000);
@@ -55,7 +56,7 @@ export function ProjectSwitcher() {
         disabled={isGenerating}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="h-9 max-w-[220px] px-3 rounded-lg border border-border bg-canvas hover:bg-white flex items-center gap-2 text-[13px] font-medium text-foreground disabled:opacity-50"
+        className="h-9 max-w-[220px] px-3 rounded-lg border border-border bg-canvas hover:bg-elevated flex items-center gap-2 text-[13px] font-medium text-foreground disabled:opacity-50"
         title="Switch project"
       >
         <span className="truncate">{current.name}</span>
@@ -74,7 +75,7 @@ export function ProjectSwitcher() {
               key={current.id}
               onBlur={(e) => renameProject(current.id, e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-              className="mt-1.5 w-full h-8 px-2 rounded-md border border-border bg-white text-[13px] focus:outline-none focus:border-accent"
+              className="mt-1.5 w-full h-8 px-2 rounded-md border border-border bg-elevated text-[13px] focus:outline-none focus:border-accent"
             />
           </div>
 
@@ -87,8 +88,8 @@ export function ProjectSwitcher() {
                   setOpen(false);
                   void switchProject(project.id);
                 }}
-                className={`w-full text-left px-3 py-2 flex items-center justify-between gap-3 hover:bg-[rgba(0,0,0,0.04)] ${
-                  project.id === currentProjectId ? "bg-[rgba(47,110,184,0.06)]" : ""
+                className={`w-full text-left px-3 py-2 flex items-center justify-between gap-3 hover:bg-foreground/[0.04] ${
+                  project.id === currentProjectId ? "bg-accent/10" : ""
                 }`}
               >
                 <span className="min-w-0">
@@ -111,6 +112,15 @@ export function ProjectSwitcher() {
               className="h-8 px-3 rounded-md text-[12px] font-medium text-accent hover:bg-accent/10"
             >
               + New project
+            </button>
+            <button
+              onClick={() => {
+                setOpen(false);
+                useUIStore.getState().setImportOpen(true);
+              }}
+              className="h-8 px-3 rounded-md text-[12px] font-medium text-foreground hover:bg-foreground/5"
+            >
+              Import SQL…
             </button>
             {confirmDelete ? (
               <span className="flex items-center gap-1.5">

@@ -45,7 +45,7 @@ export function RelationshipEditor({ relationship: rel }: { relationship: Relati
       </div>
 
       <SectionHeader title="Cardinality" />
-      <div className="inline-flex rounded-lg border border-border p-0.5 bg-white/60" role="radiogroup" aria-label="Cardinality">
+      <div className="inline-flex rounded-lg border border-border p-0.5 bg-elevated/60" role="radiogroup" aria-label="Cardinality">
         {cardinalities.map((value) => (
           <button
             key={value}
@@ -54,7 +54,7 @@ export function RelationshipEditor({ relationship: rel }: { relationship: Relati
             aria-checked={rel.cardinality === value}
             onClick={() => updateRelationship(rel.id, { cardinality: value })}
             className={`h-7 px-3 rounded-md text-[12px] font-mono transition-colors ${
-              rel.cardinality === value ? "bg-[#EDE3D3] text-foreground font-semibold" : "text-muted hover:text-foreground"
+              rel.cardinality === value ? "bg-pill text-foreground font-semibold" : "text-muted hover:text-foreground"
             }`}
           >
             {value}
@@ -88,7 +88,7 @@ export function RelationshipEditor({ relationship: rel }: { relationship: Relati
             <label
               key={option.value}
               className={`flex items-start gap-2 rounded-md px-2 py-1.5 text-[12px] ${
-                rel.onDelete === option.value ? "bg-[rgba(0,0,0,0.035)]" : ""
+                rel.onDelete === option.value ? "bg-foreground/[0.035]" : ""
               } ${disabled ? "opacity-45" : "cursor-pointer"}`}
               title={disabled ? "Make the relationship optional to use SET NULL" : undefined}
             >

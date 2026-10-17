@@ -30,7 +30,7 @@ function ToolButton({
       disabled={disabled}
       title={title}
       aria-label={title}
-      className="h-8 px-2.5 rounded-md flex items-center gap-1.5 text-[12px] font-medium text-foreground hover:bg-[rgba(0,0,0,0.05)] disabled:opacity-35 disabled:hover:bg-transparent transition-colors"
+      className="h-8 px-2.5 rounded-md flex items-center gap-1.5 text-[12px] font-medium text-foreground hover:bg-foreground/[0.05] disabled:opacity-35 disabled:hover:bg-transparent transition-colors"
     >
       {children}
     </button>
