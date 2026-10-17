@@ -176,7 +176,7 @@ export async function POST(request: Request) {
     if (includeSql) {
       const schemaHeader = [
         "-- Episteme — generated database schema (PostgreSQL dialect).",
-        "-- Verified in-browser against an equivalent SQLite sandbox (sql.js);",
+        "-- Tested in-browser in real Postgres (PGlite): DDL, sample rows, and every constraint;",
         "-- see verification_report.html for the chaos-test results.",
         "",
         "",

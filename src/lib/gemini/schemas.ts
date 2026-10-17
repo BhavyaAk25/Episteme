@@ -204,26 +204,11 @@ export const GenerationResponseSchema = z.object({
   build_steps: z.unknown().optional(),
 });
 
-// Auto-fix schema
-export const PatchSchema = z.object({
-  incident_id: z.string(),
-  root_cause: z.string(),
-  fix_category: z.string(),
-  migration_sql: z.string(),
-  explanation: z.string(),
-  expected_after_fix: z.string(),
-});
-
-export const AutoFixResponseSchema = z.object({
-  patches: z.array(PatchSchema),
-});
-
 // Export type inferences
 export type Plan = z.infer<typeof PlanSchema>;
 export type Ontology = z.infer<typeof OntologySchema>;
 export type ERD = z.infer<typeof ERDSchema>;
 export type GenerationResponse = z.infer<typeof GenerationResponseSchema>;
-export type AutoFixResponse = z.infer<typeof AutoFixResponseSchema>;
 
 // AI edit operations. Unknown or malformed operations are dropped.
 const optionalText = z.string().nullish().transform((v) => (v === null || v === undefined || v === "" ? undefined : v));

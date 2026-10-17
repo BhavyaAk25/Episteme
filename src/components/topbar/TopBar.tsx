@@ -4,29 +4,13 @@ import { useCallback, useEffect } from "react";
 import Image from "next/image";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useSimulationStore } from "@/store/useSimulationStore";
+import { useIssues } from "@/lib/verify/useIssues";
 import { useUIStore } from "@/store/useUIStore";
 import { useErdStore } from "@/store/useErdStore";
 import { PhaseProgress } from "./PhaseProgress";
 import { ProjectSwitcher } from "@/components/projects/ProjectSwitcher";
 import { generateSchema } from "@/lib/actions/generateSchema";
 import { MAX_PROMPT_LENGTH } from "@/lib/limits";
-import { runSimulation } from "@/lib/simulation/testRunner";
-import { verifyPatchedSchema } from "@/lib/simulation/autofixRunner";
-import type { Patch } from "@/types/simulation";
-
-interface AutoFixApiResponse {
-  patches: Patch[];
-  warnings?: string[];
-}
-
-function shouldIgnoreShortcuts(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-
-  const tagName = target.tagName.toLowerCase();
-  return target.isContentEditable || tagName === "input" || tagName === "textarea" || tagName === "select";
-}
 
 export function TopBar() {
   const {
@@ -39,225 +23,38 @@ export function TopBar() {
     templateId,
   } = useProjectStore();
   const erd = useErdStore((state) => ((state.erd?.tables.length ?? 0) > 0 ? state.erd : null));
-  const { isRunning: isSimulating, isFixing, results } = useSimulationStore();
+  const isSimulating = useSimulationStore((state) => state.isRunning);
   const { openExportModal } = useUIStore();
-  const hasOpenIncidents = (results?.incidents ?? []).some((incident) => incident.status === "open");
+  const issues = useIssues();
+  const problemCount = issues.filter((issue) => issue.severity !== "info").length;
 
   const handleGenerate = useCallback(async () => {
     await generateSchema();
   }, []);
 
-  const handleSimulate = useCallback(async () => {
+  const handleRunTests = useCallback(() => {
     if (!erd || isSimulating) return;
-
-    const {
-      startSimulation,
-      stopSimulation,
-      setResults,
-      addTestResult,
-      addIncident,
-      reset: resetSimulation,
-    } = useSimulationStore.getState();
-    const { openDrawer } = useUIStore.getState();
-
-    // Reset and start simulation
-    resetSimulation();
-    startSimulation();
-    openDrawer();
-
-    try {
-      const results = await runSimulation(erd, (testResult) => {
-        addTestResult(testResult);
-        if (!testResult.passed) {
-          addIncident({
-            id: `incident_${testResult.testId}`,
-            testResult,
-            status: "open",
-            rootCause: null,
-            suggestedFix: null,
-            patch: null,
-            createdAt: Date.now(),
-            fixedAt: null,
-          });
-        }
-      });
-
-      setResults(results);
-    } catch (error) {
-      stopSimulation();
-      useProjectStore.getState().setErrorWithTitle(
-        "Simulation Failed",
-        error instanceof Error ? error.message : "Simulation failed"
-      );
-    }
+    useUIStore.getState().openDrawer();
+    void useSimulationStore.getState().runTests();
   }, [erd, isSimulating]);
-
-  const handleAutoFix = async () => {
-    if (!erd || isFixing || isSimulating || isGenerating) return;
-
-    const simulationStore = useSimulationStore.getState();
-    const currentResults = simulationStore.results;
-
-    if (!currentResults) {
-      useProjectStore.getState().setErrorWithTitle(
-        "Auto-Fix Unavailable",
-        "Run simulation first to generate incidents."
-      );
-      return;
-    }
-
-    // The API accepts at most 20 incidents per request; the rest stay open
-    // and can be fixed with another click.
-    const targetIncidents = currentResults.incidents
-      .filter((incident) => incident.status === "open")
-      .slice(0, 20);
-
-    if (targetIncidents.length === 0) {
-      useProjectStore.getState().setErrorWithTitle(
-        "Auto-Fix Unavailable",
-        "No open incidents to auto-fix."
-      );
-      return;
-    }
-
-    simulationStore.startFixing();
-    for (const incident of targetIncidents) {
-      simulationStore.updateIncidentStatus(incident.id, "fixing");
-    }
-
-    const originalSchemaSql = currentResults.schemaSql;
-
-    try {
-      const response = await fetch("/api/autofix", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          schemaSql: originalSchemaSql,
-          incidents: targetIncidents,
-          erd,
-          maxIncidents: targetIncidents.length,
-        }),
-      });
-
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.error || "Auto-fix generation failed");
-      }
-
-      const { patches, warnings } = payload as AutoFixApiResponse;
-      if (!patches || patches.length === 0) {
-        throw new Error("No patches were generated for the current incidents.");
-      }
-
-      const verification = await verifyPatchedSchema(erd, patches);
-      const patchByIncidentId = new Map<string, Patch>(
-        patches.map((patch) => [patch.incidentId, patch])
-      );
-      const patchVerificationByIncidentId = new Map(
-        verification.patchVerifications.map((entry) => [entry.patch.incidentId, entry])
-      );
-
-      const updatedIncidents = currentResults.incidents.map((incident) => {
-        const generatedPatch = patchByIncidentId.get(incident.id);
-        if (!generatedPatch) {
-          if (incident.status === "fixing") {
-            return { ...incident, status: "wont_fix" as const };
-          }
-          return incident;
-        }
-
-        const patchExecution = patchVerificationByIncidentId.get(incident.id);
-        const rerunResult = verification.testResultById[incident.testResult.testId];
-        const verified = Boolean(patchExecution?.applied && rerunResult?.passed);
-        const verificationError = patchExecution?.error ?? rerunResult?.error ?? null;
-        const patchWithMetadata: Patch = {
-          ...generatedPatch,
-          beforeSchemaSql: originalSchemaSql,
-          afterSchemaSql: `${originalSchemaSql}\n\n${generatedPatch.migrationSql}`.trim(),
-          verified,
-          verificationError,
-        };
-
-        if (!verified) {
-          return {
-            ...incident,
-            status: "open" as const,
-            patch: patchWithMetadata,
-            rootCause: generatedPatch.rootCause,
-            suggestedFix: generatedPatch.explanation,
-          };
-        }
-
-        return {
-          ...incident,
-          status: "fixed" as const,
-          patch: patchWithMetadata,
-          rootCause: generatedPatch.rootCause,
-          suggestedFix: generatedPatch.explanation,
-          fixedAt: Date.now(),
-          testResult: rerunResult ?? incident.testResult,
-        };
-      });
-
-      simulationStore.setResults({
-        ...currentResults,
-        totalTests: verification.totalTests,
-        passedCount: verification.passedCount,
-        failedCount: verification.failedCount,
-        testResults: verification.testResults,
-        incidents: updatedIncidents,
-        completedAt: Date.now(),
-      });
-
-      if (warnings && warnings.length > 0) {
-        useProjectStore.getState().setErrorWithTitle(
-          "Auto-Fix Notice",
-          warnings.join(" ")
-        );
-      }
-    } catch (error) {
-      for (const incident of targetIncidents) {
-        simulationStore.updateIncidentStatus(incident.id, "open");
-      }
-
-      useProjectStore.getState().setErrorWithTitle(
-        "Auto-Fix Failed",
-        error instanceof Error ? error.message : "Auto-fix failed"
-      );
-    } finally {
-      simulationStore.stopFixing();
-    }
-  };
 
   const handleExport = useCallback(() => {
     if (!erd) return;
     openExportModal();
   }, [erd, openExportModal]);
 
+  // Shortcuts that don't fight the browser: ⌘/Ctrl+Enter generates
+  // (Enter in the prompt box works too).
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const hasModifier = event.ctrlKey || event.metaKey;
-      if (!hasModifier || shouldIgnoreShortcuts(event.target)) {
-        return;
-      }
-
-      const key = event.key.toLowerCase();
-      if (key === "g") {
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
         event.preventDefault();
         void handleGenerate();
-      } else if (key === "s") {
-        event.preventDefault();
-        void handleSimulate();
-      } else if (key === "e") {
-        event.preventDefault();
-        handleExport();
       }
     };
-
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleGenerate, handleSimulate, handleExport]);
+  }, [handleGenerate]);
 
   const templateLabel = (id: string | null) =>
     id === "saas" ? "SaaS" : id === "ecommerce" ? "E-Commerce" : id === "inventory" ? "Inventory" : null;
@@ -329,23 +126,33 @@ export function TopBar() {
 
           <div className="flex items-center gap-3 shrink-0 mr-12 md:mr-16">
             <button
-              onClick={handleSimulate}
-              title="Simulate (Ctrl/Cmd + S)"
+              onClick={handleRunTests}
+              title="Run the schema in real Postgres and test every rule"
               disabled={!erd || isSimulating || isGenerating}
               className="ui-ghost-btn disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              Simulate
+              {isSimulating ? "Testing…" : "Run tests"}
             </button>
             <button
-              onClick={handleAutoFix}
-              disabled={!erd || isFixing || isSimulating || isGenerating || !hasOpenIncidents}
-              className="ui-ghost-btn disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              onClick={() => useUIStore.getState().openDrawer()}
+              disabled={!erd}
+              title="Design issues and test results"
+              className="ui-ghost-btn disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
             >
-              {isFixing ? "Fixing..." : "Auto-Fix"}
+              Issues
+              {erd && (
+                <span
+                  className={`min-w-5 h-5 px-1.5 rounded-full text-[11px] font-semibold inline-flex items-center justify-center ${
+                    problemCount ? "bg-warning/15 text-warning" : "bg-success/15 text-success"
+                  }`}
+                >
+                  {problemCount}
+                </span>
+              )}
             </button>
             <button
               onClick={handleExport}
-              title="Export (Ctrl/Cmd + E)"
+              title="Export"
               disabled={!erd}
               className="ui-ghost-btn disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >

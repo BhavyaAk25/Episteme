@@ -3,6 +3,7 @@
 import { useProjectStore } from "@/store/useProjectStore";
 import { useSimulationStore } from "@/store/useSimulationStore";
 import { useErdStore } from "@/store/useErdStore";
+import { useIssues } from "@/lib/verify/useIssues";
 
 type StepState = "done" | "active" | "attention" | "pending";
 
@@ -18,29 +19,25 @@ interface Step {
 export function PhaseProgress() {
   const isGenerating = useProjectStore((state) => state.isGenerating);
   const erd = useErdStore((state) => ((state.erd?.tables.length ?? 0) > 0 ? state.erd : null));
-  const { results, isRunning, isFixing } = useSimulationStore();
+  const run = useSimulationStore((state) => state.run);
+  const isRunning = useSimulationStore((state) => state.isRunning);
+  const issues = useIssues();
 
   if (!erd && !isGenerating) {
     return null;
   }
 
-  const openIssues = (results?.incidents ?? []).filter((incident) => incident.status === "open").length;
+  const openIssues = issues.filter((issue) => issue.severity !== "info").length;
 
   const steps: Step[] = [
     { label: "Schema", state: isGenerating ? "active" : erd ? "done" : "pending" },
     {
       label: "Verify",
-      state: isRunning ? "active" : results ? "done" : "pending",
+      state: isRunning ? "active" : run ? "done" : "pending",
     },
     {
       label: openIssues > 0 ? `Fix ${openIssues} issue${openIssues === 1 ? "" : "s"}` : "Fix issues",
-      state: isFixing
-        ? "active"
-        : !results
-          ? "pending"
-          : openIssues > 0
-            ? "attention"
-            : "done",
+      state: openIssues > 0 ? "attention" : run ? "done" : "pending",
     },
   ];
 

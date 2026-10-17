@@ -8,7 +8,7 @@ import { BuildAnimation } from "@/components/canvas/BuildAnimation";
 import { CanvasControls } from "@/components/canvas/CanvasControls";
 import { GenerationStatus } from "@/components/canvas/GenerationStatus";
 import { RightInspector } from "@/components/inspector/RightInspector";
-import { BottomDrawer } from "@/components/simulation/BottomDrawer";
+import { VerifyPanel } from "@/components/verify/VerifyPanel";
 import { ExportModal } from "@/components/export/ExportModal";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
@@ -97,7 +97,7 @@ export default function Home() {
   useEffect(
     () =>
       useErdStore.subscribe((state, previous) => {
-        if (state.erd !== previous.erd && useSimulationStore.getState().results) {
+        if (state.erd !== previous.erd && useSimulationStore.getState().run) {
           useSimulationStore.getState().reset();
         }
       }),
@@ -138,7 +138,7 @@ export default function Home() {
       </div>
 
       {/* Bottom Drawer */}
-      <BottomDrawer />
+      <VerifyPanel />
 
       {/* Export Modal */}
       <ExportModal />

@@ -1,119 +1,41 @@
 import { create } from "zustand";
-import type {
-  SimulationResults,
-  Incident,
-  TestResult,
-  Patch,
-  IncidentStatus,
-} from "@/types/simulation";
+import type { VerifyRun } from "@/lib/verify/runner";
+import { useErdStore } from "./useErdStore";
 
+/**
+ * Results of running the schema in real Postgres (PGlite). Cleared whenever
+ * the schema changes, since they describe one version of it.
+ */
 interface SimulationState {
   isRunning: boolean;
-  isFixing: boolean;
-  results: SimulationResults | null;
-
-  // Actions
-  startSimulation: () => void;
-  stopSimulation: () => void;
-  setResults: (results: SimulationResults) => void;
-  addTestResult: (result: TestResult) => void;
-  addIncident: (incident: Incident) => void;
-  updateIncidentStatus: (incidentId: string, status: IncidentStatus) => void;
-  applyPatch: (incidentId: string, patch: Patch) => void;
-
-  // Fix mode
-  startFixing: () => void;
-  stopFixing: () => void;
-
-  // Reset
+  progress: string | null;
+  run: VerifyRun | null;
+  error: string | null;
+  runTests: () => Promise<void>;
   reset: () => void;
 }
 
-const initialState = {
+export const useSimulationStore = create<SimulationState>((set, get) => ({
   isRunning: false,
-  isFixing: false,
-  results: null,
-};
+  progress: null,
+  run: null,
+  error: null,
 
-export const useSimulationStore = create<SimulationState>((set) => ({
-  ...initialState,
+  runTests: async () => {
+    const erd = useErdStore.getState().erd;
+    if (!erd || erd.tables.length === 0 || get().isRunning) return;
+    set({ isRunning: true, progress: "Starting Postgres…", error: null, run: null });
+    try {
+      const { runVerification } = await import("@/lib/verify/runner");
+      const run = await runVerification(erd, (progress) => set({ progress }));
+      // Ignore results if the schema changed while tests were running.
+      if (useErdStore.getState().erd === erd) set({ run });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : "Couldn't run the database tests." });
+    } finally {
+      set({ isRunning: false, progress: null });
+    }
+  },
 
-  startSimulation: () => set({
-    isRunning: true,
-    results: {
-      totalTests: 0,
-      passedCount: 0,
-      failedCount: 0,
-      testResults: [],
-      incidents: [],
-      seedPreview: [],
-      schemaSql: "",
-      startedAt: Date.now(),
-      completedAt: null,
-    },
-  }),
-
-  stopSimulation: () => set({ isRunning: false }),
-
-  setResults: (results) => set({
-    results,
-    isRunning: false,
-  }),
-
-  addTestResult: (result) => set((state) => {
-    if (!state.results) return state;
-    return {
-      results: {
-        ...state.results,
-        totalTests: state.results.totalTests + 1,
-        passedCount: state.results.passedCount + (result.passed ? 1 : 0),
-        failedCount: state.results.failedCount + (result.passed ? 0 : 1),
-        testResults: [...state.results.testResults, result],
-      },
-    };
-  }),
-
-  addIncident: (incident) => set((state) => {
-    if (!state.results) return state;
-    return {
-      results: {
-        ...state.results,
-        incidents: [...state.results.incidents, incident],
-      },
-    };
-  }),
-
-  updateIncidentStatus: (incidentId, status) => set((state) => {
-    if (!state.results) return state;
-    return {
-      results: {
-        ...state.results,
-        incidents: state.results.incidents.map((inc) =>
-          inc.id === incidentId
-            ? { ...inc, status, fixedAt: status === "fixed" ? Date.now() : inc.fixedAt }
-            : inc
-        ),
-      },
-    };
-  }),
-
-  applyPatch: (incidentId, patch) => set((state) => {
-    if (!state.results) return state;
-    return {
-      results: {
-        ...state.results,
-        incidents: state.results.incidents.map((inc) =>
-          inc.id === incidentId
-            ? { ...inc, patch, status: "fixed" as const, fixedAt: Date.now() }
-            : inc
-        ),
-      },
-    };
-  }),
-
-  startFixing: () => set({ isFixing: true }),
-
-  stopFixing: () => set({ isFixing: false }),
-
-  reset: () => set(initialState),
+  reset: () => set({ run: null, error: null, progress: null }),
 }));
