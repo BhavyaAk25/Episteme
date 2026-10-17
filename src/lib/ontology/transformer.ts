@@ -300,7 +300,8 @@ export function erdToSql(erd: ERD): string {
         const fk = table.constraints.find(
           (c) => c.type === "FOREIGN_KEY" && c.columns.includes(col.name)
         );
-        const onDelete = fk?.onDelete || "RESTRICT";
+        // SQL spells these with spaces: SET NULL / NO ACTION.
+        const onDelete = (fk?.onDelete || "RESTRICT").replace("_", " ");
         statements.push(
           `ALTER TABLE ${table.name} ADD CONSTRAINT fk_${table.name}_${col.name} ` +
             `FOREIGN KEY (${col.name}) REFERENCES ${col.referencesTable}(${col.referencesColumn}) ` +

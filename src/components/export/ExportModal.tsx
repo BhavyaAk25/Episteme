@@ -18,7 +18,21 @@ export function ExportModal() {
     () => (erd ? reconcileOntologyWithErd(generatedOntology ?? EMPTY_ONTOLOGY, erd) : null),
     [erd, generatedOntology]
   );
-  const { results } = useSimulationStore();
+  const run = useSimulationStore((state) => state.run);
+  // Report payload: failed Postgres tests are listed as incidents.
+  const results = run
+    ? {
+        totalTests: run.tests.length,
+        passedCount: run.tests.filter((t) => t.status === "pass").length,
+        failedCount: run.tests.filter((t) => t.status === "fail").length,
+        startedAt: run.startedAt,
+        completedAt: run.startedAt + run.durationMs,
+        incidents: [
+          ...run.ddlProblems.map((p, i) => ({ id: `ddl_${i}`, status: "open", rootCause: null, suggestedFix: null, testResult: { testName: `DDL${p.table ? ` (${p.table})` : ""}`, category: "schema", error: p.error } })),
+          ...run.tests.filter((t) => t.status === "fail").map((t) => ({ id: t.id, status: "open", rootCause: null, suggestedFix: null, testResult: { testName: t.title, category: t.kind, error: t.detail } })),
+        ],
+      }
+    : null;
 
   const [isExporting, setIsExporting] = useState(false);
   const [includeSql, setIncludeSql] = useState(true);
