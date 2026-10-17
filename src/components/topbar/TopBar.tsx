@@ -118,7 +118,7 @@ export function TopBar() {
           >
             {isGenerating ? (
               <>
-                <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span className="w-3.5 h-3.5 border-2 border-brand-ink/30 border-t-brand-ink rounded-full animate-spin" />
                 Generating...
               </>
             ) : (

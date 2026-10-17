@@ -119,7 +119,7 @@ function GenerationProgressCard({ elapsed, progress }: { elapsed: number; progre
             <li key={phase.key} className="flex items-center gap-2.5 text-[13px]">
               {state === "done" ? (
                 <span className="w-4 h-4 rounded-full bg-success flex items-center justify-center">
-                  <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <svg className="w-2.5 h-2.5 text-canvas" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                   </svg>
                 </span>
