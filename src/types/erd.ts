@@ -29,6 +29,8 @@ export interface TableIndex {
   unique: boolean;
 }
 
+export type TableColor = "slate" | "sky" | "teal" | "green" | "amber" | "rose";
+
 export interface Table {
   id: string;
   name: string;
@@ -36,6 +38,8 @@ export interface Table {
   columns: Column[];
   constraints: TableConstraint[];
   indexes: TableIndex[];
+  /** Optional color tag for visual grouping (diagram only). */
+  color?: TableColor;
 }
 
 export interface Relationship {
@@ -67,6 +71,7 @@ export interface ERDNodeData extends Record<string, unknown> {
   uniqueColumns: string[];
   /** Set while previewing an AI edit. */
   diff?: "added" | "changed";
+  color?: TableColor;
 }
 
 export interface ERDEdgeData extends Record<string, unknown> {

@@ -150,7 +150,7 @@ export function columnHandleId(column: string, side: "L" | "R"): string {
 export function parseColumnHandleId(handleId: string | null | undefined): string | null {
   if (!handleId) return null;
   const match = handleId.match(/^(.*)-(L|R)$/);
-  return match ? match[1] : null;
+  return match && match[1] !== "__table" ? match[1] : null;
 }
 
 function uniqueColumnsOf(table: ERD["tables"][number]): string[] {
@@ -197,6 +197,7 @@ export function erdToNodes(
         confidence: objectType?.confidence || "high",
         objectTypeId: table.objectTypeId,
         uniqueColumns: uniqueColumnsOf(table),
+        color: table.color,
       },
     };
   });
@@ -209,7 +210,9 @@ export function erdToNodes(
 export function erdToEdges(
   erd: ERD,
   positions: Record<string, { x: number; y: number }> = {},
-  widths: Record<string, number> = {}
+  widths: Record<string, number> = {},
+  /** In compact views some columns aren't drawn; their edges attach to the table instead. */
+  isColumnVisible: (column: ERD["tables"][number]["columns"][number]) => boolean = () => true
 ): Edge<ERDEdgeData>[] {
   const tableByName = new Map(erd.tables.map((t) => [t.name, t]));
 
@@ -242,13 +245,18 @@ export function erdToEdges(
       }
     }
 
+    const fromColumn = from.columns.find((c) => c.name === rel.fromColumn);
+    const toColumn = to.columns.find((c) => c.name === rel.toColumn);
+    const sourceName = fromColumn && isColumnVisible(fromColumn) ? rel.fromColumn : "__table";
+    const targetName = toColumn && isColumnVisible(toColumn) ? rel.toColumn : "__table";
+
     return [{
       id: rel.id,
       type: "erdRelation",
       source: from.id,
       target: to.id,
-      sourceHandle: columnHandleId(rel.fromColumn, sourceSide),
-      targetHandle: columnHandleId(rel.toColumn, targetSide),
+      sourceHandle: columnHandleId(sourceName, sourceSide),
+      targetHandle: columnHandleId(targetName, targetSide),
       data: {
         cardinality: rel.cardinality,
         required: rel.required,
