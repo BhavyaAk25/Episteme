@@ -66,7 +66,7 @@ Browser (Next.js · React Flow · Zustand)
 - **The ERD is the single source of truth.** Foreign-key flags and constraints are derived from relationships, so the diagram, SQL and every export always agree.
 - **AI output is never trusted directly.** Generation is parsed with forgiving Zod schemas; one bad field doesn't sink the result. Edits are applied through validated model functions, one operation at a time.
 - **Honest failures.** If the AI is unavailable or out of quota you get a clear message and your current schema stays. Templates and every non-AI feature keep working.
-- **Free to run.** Gemini's free tier by default; PGlite, IndexedDB and share links need no server or database. AI routes are rate-limited per client and size-limited.
+- **Free to run.** Gemini's free tier by default, with an optional free backup (Groq) when its quota runs out; brief outages are retried automatically; PGlite, IndexedDB and share links need no server or database. AI routes are rate-limited per client and size-limited.
 
 More detail: [ARCHITECTURE.md](./ARCHITECTURE.md).
 
@@ -96,6 +96,7 @@ Without a key, everything except AI generation and AI edits works.
 | `GEMINI_GENERATE_MAX_OUTPUT_TOKENS` | `16384` | Output budget for generation |
 | `AI_PROVIDER` | `gemini` | `groq`, `openrouter` or `ollama` for other free backends |
 | `AI_API_KEY` / `AI_MODEL` / `AI_BASE_URL` | per provider | Settings for those backends |
+| `AI_FALLBACK_PROVIDER` + `AI_FALLBACK_API_KEY` | none | Backup used when the main provider is out of quota or down (e.g. Groq's free tier) |
 
 ### Scripts
 

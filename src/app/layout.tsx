@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { JetBrains_Mono, IBM_Plex_Sans, Sora } from "next/font/google";
 import "./globals.css";
+import { ErrorReporter } from "@/components/shared/ErrorReporter";
 
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
@@ -55,6 +56,9 @@ export default function RootLayout({
         className={`${jetbrainsMono.variable} ${ibmPlexSans.variable} ${sora.variable} antialiased`}
       >
         {children}
+        <ErrorReporter />
+        {/* Free, cookie-free Vercel Web Analytics (served by Vercel; enable it in the project's Analytics tab). */}
+        {process.env.NODE_ENV === "production" && <script defer src="/_vercel/insights/script.js" />}
       </body>
     </html>
   );

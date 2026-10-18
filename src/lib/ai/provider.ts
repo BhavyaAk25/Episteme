@@ -1,6 +1,8 @@
 import {
   callGemini,
   getGeminiConfigStatus,
+  getGeminiErrorInfo,
+  isTransientError,
   streamGemini,
   MODEL_NAME as GEMINI_MODEL,
 } from "@/lib/gemini/client";
@@ -15,6 +17,10 @@ import { chatJson, chatJsonStream, type OpenAICompatibleConfig } from "./openaiC
  *   AI_API_KEY  = key for groq/openrouter (Gemini uses GEMINI_API_KEY)
  *   AI_MODEL    = model id (each provider has a default)
  *   AI_BASE_URL = override the API base URL (optional)
+ *
+ * Optional backup, used when the main provider is out of quota or down:
+ *   AI_FALLBACK_PROVIDER = groq | openrouter | ollama | gemini
+ *   AI_FALLBACK_API_KEY, AI_FALLBACK_MODEL, AI_FALLBACK_BASE_URL
  */
 export interface AiRequest {
   system?: string;
@@ -78,13 +84,14 @@ const geminiProvider: AiProvider = {
     }),
 };
 
-function openAiCompatibleProvider(id: string): AiProvider {
+function openAiCompatibleProvider(id: string, envPrefix = "AI"): AiProvider {
   const defaults = DEFAULTS[id];
+  const env = (name: string) => process.env[`${envPrefix}_${name}`]?.trim();
   const config: OpenAICompatibleConfig = {
     name: id,
-    baseUrl: process.env.AI_BASE_URL?.trim() || defaults.baseUrl,
-    apiKey: process.env.AI_API_KEY?.trim() || null,
-    model: process.env.AI_MODEL?.trim() || defaults.model,
+    baseUrl: env("BASE_URL") || defaults.baseUrl,
+    apiKey: env("API_KEY") || null,
+    model: env("MODEL") || defaults.model,
   };
   const args = (request: AiRequest) => ({
     system: request.system,
@@ -105,11 +112,71 @@ function openAiCompatibleProvider(id: string): AiProvider {
   };
 }
 
+/** Errors where trying another provider makes sense (not bad requests). */
+function shouldFallBack(error: unknown): boolean {
+  const info = getGeminiErrorInfo(error);
+  const code = info.providerCode ?? "";
+  return (
+    info.isQuotaOrRateLimited ||
+    info.isCooldown ||
+    info.isTruncated ||
+    ["UNAVAILABLE", "INTERNAL", "MAX_TOKENS", "INVALID_API_KEY", "UNAUTHENTICATED", "MISSING_API_KEY", "MODEL_NOT_FOUND"].includes(code) ||
+    isTransientError(info.message)
+  );
+}
+
+/** Try `primary`; on quota/outage errors, retry the same request on `backup`. */
+function withFallback(primary: AiProvider, backup: AiProvider): AiProvider {
+  return {
+    id: `${primary.id}+${backup.id}`,
+    model: primary.model,
+    config: () => {
+      const main = primary.config();
+      return main.ready ? main : backup.config();
+    },
+    generateJson: async (request) => {
+      if (!primary.config().ready) return backup.generateJson(request);
+      try {
+        return await primary.generateJson(request);
+      } catch (error) {
+        if (!shouldFallBack(error)) throw error;
+        console.warn(`[ai] ${primary.id} failed (${getGeminiErrorInfo(error).providerCode}); using ${backup.id}.`);
+        return backup.generateJson(request);
+      }
+    },
+    streamJson: async function* (request) {
+      if (!primary.config().ready) {
+        yield* backup.streamJson(request);
+        return;
+      }
+      let started = false;
+      try {
+        for await (const chunk of primary.streamJson(request)) {
+          started = true;
+          yield chunk;
+        }
+      } catch (error) {
+        // Only switch if nothing was streamed yet; a half answer can't be resumed.
+        if (started || !shouldFallBack(error)) throw error;
+        console.warn(`[ai] ${primary.id} failed (${getGeminiErrorInfo(error).providerCode}); using ${backup.id}.`);
+        yield* backup.streamJson(request);
+      }
+    },
+  };
+}
+
+function providerFor(id: string, envPrefix: string): AiProvider {
+  return id in DEFAULTS ? openAiCompatibleProvider(id, envPrefix) : geminiProvider;
+}
+
 let cached: AiProvider | null = null;
 
 export function getAiProvider(): AiProvider {
   if (cached) return cached;
-  const id = (process.env.AI_PROVIDER ?? "gemini").trim().toLowerCase();
-  cached = id in DEFAULTS ? openAiCompatibleProvider(id) : geminiProvider;
+  const primaryId = (process.env.AI_PROVIDER ?? "gemini").trim().toLowerCase();
+  const primary = providerFor(primaryId, "AI");
+  const backupId = process.env.AI_FALLBACK_PROVIDER?.trim().toLowerCase();
+  const backup = backupId && backupId !== primaryId ? providerFor(backupId, "AI_FALLBACK") : null;
+  cached = backup && backup.config().ready ? withFallback(primary, backup) : primary;
   return cached;
 }
