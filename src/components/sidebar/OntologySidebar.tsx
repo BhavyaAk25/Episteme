@@ -73,11 +73,11 @@ export function OntologySidebar() {
             {/* Content */}
             <div className="flex-1 overflow-y-auto">
               <div className="px-5 pt-4 pb-10">
-                <TemplateSelector />
+                {(!erd || erd.tables.length === 0) && <TemplateSelector />}
 
                 {erd ? (
                   <>
-                    <div className="mt-6 mb-4 -mx-5 border-t border-border/70" />
+                    {erd.tables.length === 0 && <div className="mt-6 mb-4 -mx-5 border-t border-border/70" />}
 
                     <div>
                       <h3 className="ui-section-title">Tables</h3>

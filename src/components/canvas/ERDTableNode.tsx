@@ -1,9 +1,38 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { ERDNodeData } from "@/types/erd";
 import { columnHandleId } from "@/lib/ontology/transformer";
+import { useErdStore } from "@/store/useErdStore";
+
+/** In-place name editor: Enter or blur saves, Escape cancels. */
+function InlineName({ value, onSave, onDone, className }: { value: string; onSave: (next: string) => void; onDone: () => void; className: string }) {
+  const [draft, setDraft] = useState(value);
+  return (
+    <input
+      autoFocus
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onFocus={(e) => e.target.select()}
+      onBlur={() => {
+        if (draft.trim() && draft !== value) onSave(draft.trim());
+        onDone();
+      }}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        if (e.key === "Escape") {
+          setDraft(value);
+          onDone();
+        }
+      }}
+      spellCheck={false}
+      aria-label="Rename"
+      className={`nodrag nopan min-w-0 rounded px-1 -mx-1 bg-elevated border border-accent outline-none ${className}`}
+    />
+  );
+}
 
 const KeyIcon = () => (
   <svg className="w-3 h-3 text-warning" fill="currentColor" viewBox="0 0 20 20" aria-label="Primary key">
@@ -29,8 +58,10 @@ const LinkIcon = () => (
 // another table's key to create a foreign key.
 const handleClass = "erd-handle !w-2.5 !h-2.5 !min-w-0 !min-h-0 !bg-elevated !border-[1.5px] !border-accent";
 
-function ERDTableNodeComponent({ data, selected }: NodeProps) {
+function ERDTableNodeComponent({ id, data, selected, draggable }: NodeProps) {
   const nodeData = data as ERDNodeData;
+  const editable = draggable !== false && !nodeData.diff;
+  const [editing, setEditing] = useState<{ kind: "table" } | { kind: "column"; name: string } | null>(null);
   const unique = new Set(nodeData.uniqueColumns ?? []);
   const footerConstraints = nodeData.constraints.filter(
     (c) => c.type === "CHECK" || (c.type === "UNIQUE" && c.columns.length > 1)
@@ -68,9 +99,26 @@ function ERDTableNodeComponent({ data, selected }: NodeProps) {
         style={{ background: "linear-gradient(135deg, var(--node-header-from) 0%, var(--node-header-to) 100%)" }}
       >
         <span className={`w-2 h-2 rounded-full ${statusColor} shrink-0`} title={`Status: ${nodeData.status}`} />
-        <span className="font-mono font-bold text-foreground text-[13px] tracking-tight truncate">
-          {nodeData.tableName}
-        </span>
+        {editing?.kind === "table" ? (
+          <InlineName
+            value={nodeData.tableName}
+            className="font-mono font-bold text-[13px] w-40"
+            onSave={(name) => useErdStore.getState().renameTable(id, name)}
+            onDone={() => setEditing(null)}
+          />
+        ) : (
+          <span
+            className="font-mono font-bold text-foreground text-[13px] tracking-tight truncate"
+            onDoubleClick={(e) => {
+              if (!editable) return;
+              e.stopPropagation();
+              setEditing({ kind: "table" });
+            }}
+            title={editable ? "Double-click to rename" : undefined}
+          >
+            {nodeData.tableName}
+          </span>
+        )}
         <span className="ml-auto text-[10px] text-muted font-mono">{nodeData.columns.length} cols</span>
       </div>
 
@@ -84,9 +132,25 @@ function ERDTableNodeComponent({ data, selected }: NodeProps) {
             <span className="w-4 h-4 flex items-center justify-center shrink-0">
               {col.isPrimaryKey ? <KeyIcon /> : col.isForeignKey ? <LinkIcon /> : null}
             </span>
-            <span className={`text-[12px] font-mono flex-1 truncate ${col.isPrimaryKey ? "font-semibold text-foreground" : "text-foreground"}`}>
-              {col.name}
-            </span>
+            {editing?.kind === "column" && editing.name === col.name ? (
+              <InlineName
+                value={col.name}
+                className="font-mono text-[12px] flex-1"
+                onSave={(name) => useErdStore.getState().updateColumn(id, col.name, { name })}
+                onDone={() => setEditing(null)}
+              />
+            ) : (
+              <span
+                className={`text-[12px] font-mono flex-1 truncate ${col.isPrimaryKey ? "font-semibold text-foreground" : "text-foreground"}`}
+                onDoubleClick={(e) => {
+                  if (!editable) return;
+                  e.stopPropagation();
+                  setEditing({ kind: "column", name: col.name });
+                }}
+              >
+                {col.name}
+              </span>
+            )}
             {unique.has(col.name) && !col.isPrimaryKey && (
               <span className="text-[9px] font-mono font-semibold text-teal" title="Unique">UQ</span>
             )}

@@ -352,3 +352,12 @@ nextjs-portal,
 .erd-handle.connectingto {
   opacity: 1;
 }
+
+/* Logo: the warm mark on light, a cool-toned mark on dark. */
+.logo-dark { display: none; }
+:root[data-theme="dark"] .logo-light { display: none; }
+:root[data-theme="dark"] .logo-dark { display: block; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .logo-light { display: none; }
+  :root:not([data-theme="light"]) .logo-dark { display: block; }
+}

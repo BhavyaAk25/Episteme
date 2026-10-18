@@ -7,7 +7,7 @@ import { useSimulationStore } from "@/store/useSimulationStore";
 import { useIssues } from "@/lib/verify/useIssues";
 import { useUIStore } from "@/store/useUIStore";
 import { useErdStore } from "@/store/useErdStore";
-import { PhaseProgress } from "./PhaseProgress";
+import { SaveIndicator } from "./SaveIndicator";
 import { ProjectSwitcher } from "@/components/projects/ProjectSwitcher";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { generateSchema } from "@/lib/actions/generateSchema";
@@ -21,7 +21,6 @@ export function TopBar() {
     generationMode,
     fallbackDomain,
     generationWarning,
-    templateId,
   } = useProjectStore();
   const erd = useErdStore((state) => ((state.erd?.tables.length ?? 0) > 0 ? state.erd : null));
   const isSimulating = useSimulationStore((state) => state.isRunning);
@@ -72,8 +71,6 @@ export function TopBar() {
           }
         : null;
 
-  const selectedTemplateLabel = templateLabel(templateId);
-  const showStatusRow = Boolean(status) || Boolean(selectedTemplateLabel) || Boolean(erd);
 
   return (
     <header className="relative z-40 bg-surface/94 backdrop-blur border-b border-border px-4 md:px-6 pt-[calc(env(safe-area-inset-top,0px)+12px)] shadow-[0_6px_18px_rgba(86,61,38,0.08)]">
@@ -81,19 +78,15 @@ export function TopBar() {
         <div className="flex flex-wrap lg:flex-nowrap items-center gap-x-4 gap-y-2 w-full min-w-0">
           <div className="flex items-center gap-2.5 shrink-0">
             <div className="w-10 h-10 flex items-center justify-center">
-              <Image
-                src="/brand/episteme-mark.svg"
-                alt="Episteme logo"
-                width={40}
-                height={40}
-                className="w-10 h-10 object-contain"
-              />
+              <Image src="/brand/episteme-mark.svg" alt="Episteme" width={40} height={40} className="logo-light w-10 h-10 object-contain" priority />
+              <Image src="/brand/episteme-mark-dark.svg" alt="" aria-hidden="true" width={40} height={40} className="logo-dark w-10 h-10 object-contain" />
             </div>
             <span className="font-display text-[1.6rem] leading-none tracking-tight text-foreground hidden lg:block">
               Episteme
             </span>
           </div>
           <ProjectSwitcher />
+          <SaveIndicator />
 
           {/* On narrow screens the description gets its own full-width row. */}
           <div className="order-last basis-full lg:order-none lg:basis-auto lg:flex-1 min-w-0">
@@ -165,36 +158,15 @@ export function TopBar() {
         </div>
       </div>
 
-      {showStatusRow && (
-        <div className="h-10 flex items-center gap-2.5 border-t border-border/60">
-          <div className="flex items-center gap-2 shrink-0">
-            {status && (
-              <span
-                title={status.title}
-                className={`inline-flex items-center px-2.5 py-0.5 text-[12px] font-medium rounded-full ${status.tone}`}
-              >
-                {status.text}
-              </span>
-            )}
-            {selectedTemplateLabel && !isGenerating && generationMode !== "fallback" && (
-              <span className="inline-flex items-center px-2.5 py-0.5 text-[12px] font-medium rounded-full bg-foreground/[0.04] text-muted">
-                Template: {selectedTemplateLabel}
-              </span>
-            )}
-            {generationMode === "fallback" && (
-              <button
-                onClick={handleGenerate}
-                disabled={isGenerating}
-                className="text-[12px] text-accent font-medium hover:underline disabled:opacity-50"
-              >
-                Retry with AI
-              </button>
-            )}
-          </div>
-
-          <div className="hidden lg:flex min-w-0 flex-1 justify-center">
-            <PhaseProgress />
-          </div>
+      {generationMode === "fallback" && !isGenerating && (
+        <div className="h-9 flex items-center gap-3 border-t border-border/60 text-[12px]">
+          <span className="inline-flex items-center px-2.5 py-0.5 font-medium rounded-full bg-warning/15 text-warning" title={generationWarning ?? undefined}>
+            {status?.text ?? "Built-in template"}
+          </span>
+          <span className="text-muted truncate">The AI was unavailable, so this is the built-in template you picked.</span>
+          <button onClick={handleGenerate} className="text-accent font-medium hover:underline shrink-0">
+            Retry with AI
+          </button>
         </div>
       )}
     </header>
