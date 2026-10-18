@@ -16,6 +16,7 @@ import type {
   OnDeleteAction,
   Relationship,
   Table,
+  TableColor,
   TableConstraint,
 } from "@/types/erd";
 import type { Cardinality } from "@/types/ontology";
@@ -708,6 +709,73 @@ export function deleteRelationship(erd: ERD, relationshipId: string): EditResult
   return {
     ok: true,
     erd: normalizeErd({ ...erd, relationships: erd.relationships.filter((r) => r.id !== relationshipId) }),
+  };
+}
+
+export function setTableColor(erd: ERD, tableIds: string[], color: TableColor | null): EditResult {
+  const ids = new Set(tableIds);
+  return {
+    ok: true,
+    erd: {
+      ...erd,
+      tables: erd.tables.map((t) => {
+        if (!ids.has(t.id)) return t;
+        const next = { ...t };
+        if (color) next.color = color;
+        else delete next.color;
+        return next;
+      }),
+    },
+  };
+}
+
+export interface TableClipboard {
+  tables: Table[];
+  relationships: Relationship[];
+}
+
+/** Tables plus the relationships among them, or out to tables that will still exist. */
+export function copyTables(erd: ERD, tableIds: string[]): TableClipboard {
+  const tables = erd.tables.filter((t) => tableIds.includes(t.id));
+  const names = new Set(tables.map((t) => t.name));
+  return {
+    tables: JSON.parse(JSON.stringify(tables)),
+    relationships: erd.relationships.filter((r) => names.has(r.fromTable)),
+  };
+}
+
+/**
+ * Paste copied tables as new tables with unique names ("orders_copy").
+ * Relationships between pasted tables are re-pointed at the copies;
+ * relationships to other tables are kept if those tables exist.
+ */
+export function pasteTables(erd: ERD, clip: TableClipboard): EditResult<{ idMap: Record<string, string> }> {
+  const existing = new Set(erd.tables.map((t) => t.name));
+  const nameMap = new Map<string, string>();
+  const idMap: Record<string, string> = {};
+  const newTables: Table[] = clip.tables.map((table) => {
+    let name = `${table.name}_copy`.slice(0, 63);
+    let n = 2;
+    while (existing.has(name) || [...nameMap.values()].includes(name)) name = `${table.name}_copy${n++}`.slice(0, 63);
+    nameMap.set(table.name, name);
+    const id = randomId("tbl");
+    idMap[table.id] = id;
+    return { ...table, id, name, objectTypeId: id, indexes: table.indexes.map((i) => ({ ...i, name: `${i.name}_${name}`.slice(0, 60) })) };
+  });
+  const allNames = new Set([...existing, ...nameMap.values()]);
+  const newRelationships: Relationship[] = clip.relationships
+    .filter((r) => nameMap.has(r.fromTable))
+    .map((r) => ({
+      ...r,
+      id: randomId("rel"),
+      fromTable: nameMap.get(r.fromTable) as string,
+      toTable: nameMap.get(r.toTable) ?? r.toTable,
+    }))
+    .filter((r) => allNames.has(r.toTable));
+  return {
+    ok: true,
+    erd: normalizeErd({ tables: [...erd.tables, ...newTables], relationships: [...erd.relationships, ...newRelationships] }),
+    idMap,
   };
 }
 

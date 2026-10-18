@@ -5,7 +5,7 @@ import { Panel, useReactFlow } from "@xyflow/react";
 import { useStore } from "zustand";
 import { useErdStore, undoErd, redoErd } from "@/store/useErdStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
-import { useUIStore } from "@/store/useUIStore";
+import { useUIStore, type NodeDetail } from "@/store/useUIStore";
 import { useProjectStore } from "@/store/useProjectStore";
 import { layoutErd } from "@/lib/erd/layout";
 import { HistoryPanel } from "@/components/projects/HistoryPanel";
@@ -71,6 +71,34 @@ function findFreeSpot(start: { x: number; y: number }): { x: number; y: number }
   return start;
 }
 
+/** Full columns / keys only / names only — for reading large diagrams. */
+function DetailToggle() {
+  const detail = useUIStore((state) => state.nodeDetail);
+  const options: Array<{ value: NodeDetail; label: string; title: string }> = [
+    { value: "full", label: "All", title: "Show all columns" },
+    { value: "keys", label: "Keys", title: "Show only key columns" },
+    { value: "names", label: "Names", title: "Show only table names" },
+  ];
+  return (
+    <div className="flex items-center rounded-md bg-foreground/[0.04] p-0.5" role="radiogroup" aria-label="Column detail">
+      {options.map((option) => (
+        <button
+          key={option.value}
+          role="radio"
+          aria-checked={detail === option.value}
+          title={option.title}
+          onClick={() => useUIStore.getState().setNodeDetail(option.value)}
+          className={`h-7 px-2 rounded text-[12px] font-medium transition-colors ${
+            detail === option.value ? "bg-elevated text-foreground shadow-sm" : "text-muted hover:text-foreground"
+          }`}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** Editing toolbar, rendered inside <ReactFlow>. */
 export function CanvasToolbar({ disabled }: { disabled: boolean }) {
   const { screenToFlowPosition } = useReactFlow();
@@ -114,7 +142,7 @@ export function CanvasToolbar({ disabled }: { disabled: boolean }) {
 
   return (
     <Panel position="top-left" className="!m-3">
-      <div className="flex items-center gap-0.5 rounded-lg border border-border bg-surface/95 backdrop-blur px-1 py-1 shadow-sm">
+      <div data-tour="toolbar" className="flex flex-wrap items-center gap-0.5 rounded-lg border border-border bg-surface/95 backdrop-blur px-1 py-1 shadow-sm max-w-[calc(100vw-40px)]">
         <ToolButton onClick={handleAddTable} disabled={disabled} title="Add table">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeWidth={2} d="M12 5v14M5 12h14" />
@@ -152,6 +180,8 @@ export function CanvasToolbar({ disabled }: { disabled: boolean }) {
           </svg>
           Replay
         </ToolButton>
+        <span className="w-px h-5 bg-border mx-1" />
+        <DetailToggle />
         <span className="w-px h-5 bg-border mx-1" />
         <ToolButton onClick={() => setHistoryOpen(!historyOpen)} disabled={disabled} title="Version history">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">

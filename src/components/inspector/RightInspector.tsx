@@ -27,7 +27,7 @@ export function RightInspector() {
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: inspectorWidth, opacity: 0 }}
           transition={{ type: "spring", damping: 25, stiffness: 300 }}
-          className="h-full bg-surface border-l border-border flex flex-col overflow-hidden shadow-sm shrink-0"
+          className="h-full bg-surface border-l border-border flex flex-col overflow-hidden shadow-sm shrink-0 max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:top-auto max-md:h-[78vh] max-md:!w-full max-md:z-40 max-md:rounded-t-2xl max-md:border-t max-md:shadow-2xl"
           style={{ width: inspectorWidth }}
           aria-label={table ? "Table editor" : "Relationship editor"}
         >

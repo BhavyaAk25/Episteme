@@ -111,7 +111,7 @@ export function VerifyPanel() {
             <span className={counts.warning ? "text-warning font-semibold" : "text-muted"}>{counts.warning} warning{counts.warning === 1 ? "" : "s"}</span>
             <span className="text-muted">{counts.info} suggestion{counts.info === 1 ? "" : "s"}</span>
           </span>
-          <span className="text-[12px] text-muted truncate">
+          <span className="hidden sm:inline text-[12px] text-muted truncate">
             {isRunning
               ? progress
               : run

@@ -122,6 +122,7 @@ export function TopBar() {
           <div className="flex items-center gap-2 lg:gap-3 shrink-0 ml-auto lg:ml-0">
             <button
               onClick={handleRunTests}
+              data-tour="run-tests"
               title="Run the schema in real Postgres and test every rule"
               disabled={!erd || isSimulating || isGenerating}
               className="ui-ghost-btn disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -148,6 +149,7 @@ export function TopBar() {
             <ThemeToggle />
             <button
               onClick={handleExport}
+              data-tour="export"
               title="Export"
               disabled={!erd}
               className="ui-ghost-btn disabled:opacity-50 disabled:cursor-not-allowed transition-colors"

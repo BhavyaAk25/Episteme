@@ -3,6 +3,7 @@
 import { useProjectStore } from "@/store/useProjectStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
 import { useErdStore } from "@/store/useErdStore";
+import { TABLE_COLORS } from "@/lib/erd/colors";
 import { useUIStore } from "@/store/useUIStore";
 import { SidebarLoadingSkeleton } from "@/components/shared/LoadingStates";
 import { TemplateSelector } from "./TemplateSelector";
@@ -57,7 +58,7 @@ export function OntologySidebar() {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -sidebarWidth, opacity: 0 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="h-full bg-surface border-r border-border/60 flex flex-col overflow-hidden"
+            className="h-full bg-surface border-r border-border/60 flex flex-col overflow-hidden max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:shadow-2xl"
             style={{ width: sidebarWidth }}
           >
             {/* Header */}
@@ -99,7 +100,10 @@ export function OntologySidebar() {
                               }`}
                             >
                               <div className="flex items-center justify-between gap-2">
-                                <span className="font-mono text-[12px] font-semibold text-foreground truncate">{table.name}</span>
+                                <span className="flex items-center gap-1.5 min-w-0">
+                                  {table.color && <span className="w-2 h-2 rounded-full shrink-0" style={{ background: TABLE_COLORS[table.color] }} />}
+                                  <span className="font-mono text-[12px] font-semibold text-foreground truncate">{table.name}</span>
+                                </span>
                                 <span className="text-[11px] text-muted shrink-0">{table.columns.length} cols</span>
                               </div>
                               {description && (

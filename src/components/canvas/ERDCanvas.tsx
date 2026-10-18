@@ -23,10 +23,13 @@ import { useReplayView } from "@/lib/erd/useReplayView";
 import { useAiEditStore } from "@/store/useAiEditStore";
 import { AiEditBar } from "./AiEditBar";
 import { erdToNodes, erdToEdges, parseColumnHandleId } from "@/lib/ontology/transformer";
+import { copyTables, type TableClipboard } from "@/lib/erd/model";
+import { duplicateTables, selectPasted } from "@/lib/actions/clipboard";
 import { ERDTableNode } from "./ERDTableNode";
 import { ERDRelationEdge } from "./ERDRelationEdge";
 import { CanvasAutoFit, CANVAS_FIT_OPTIONS } from "./CanvasAutoFit";
 import { CanvasToolbar } from "./CanvasToolbar";
+import { SelectionBar } from "./SelectionBar";
 import { CrowsFootMarkers } from "./CrowsFootMarkers";
 import { EditorToast } from "./EditorToast";
 import type { ERDNodeData } from "@/types/erd";
@@ -69,22 +72,26 @@ export function ERDCanvas() {
         ...node,
         data: { ...node.data, diff: added.has(node.id) ? "added" : changed.has(node.id) ? "changed" : undefined },
         measured: previousById.get(node.id)?.measured,
-        selected: node.id === selectedId,
+        // Keep multi-selection across edits; fall back to the inspected table.
+        selected: previousById.get(node.id)?.selected ?? node.id === selectedId,
         draggable: !replaying,
       }))
     );
   }, [viewErd, ontology, positions, replaying, previewing, diff, setNodes]);
 
   // Edges follow live node positions so each end attaches to the facing side.
+  const detail = useUIStore((state) => state.nodeDetail);
   const edges = useMemo(() => {
     if (!viewErd) return [];
     const livePositions = Object.fromEntries(nodes.map((node) => [node.id, node.position]));
     const widths = Object.fromEntries(nodes.map((node) => [node.id, node.measured?.width ?? 280]));
-    return erdToEdges(viewErd, livePositions, widths).map((edge) => ({
+    const visible = (column: { isPrimaryKey: boolean; isForeignKey: boolean }) =>
+      detail === "full" ? true : detail === "keys" ? column.isPrimaryKey || column.isForeignKey : false;
+    return erdToEdges(viewErd, livePositions, widths, visible).map((edge) => ({
       ...edge,
       selected: edge.id === selectedEdgeId,
     }));
-  }, [viewErd, nodes, selectedEdgeId]);
+  }, [viewErd, nodes, selectedEdgeId, detail]);
 
   const onNodeClick: NodeMouseHandler = useCallback(
     (_, node) => {
@@ -150,21 +157,64 @@ export function ERDCanvas() {
         redoErd();
         return;
       }
+      const selectedIds = useCanvasStore.getState().nodes.filter((n) => n.selected).map((n) => n.id);
+      if (mod && key === "a") {
+        event.preventDefault();
+        useCanvasStore.getState().setNodes(useCanvasStore.getState().nodes.map((n) => ({ ...n, selected: true })));
+        return;
+      }
+      if (mod && key === "d") {
+        const ids = selectedIds.length ? selectedIds : [useCanvasStore.getState().selectedNodeId].filter(Boolean) as string[];
+        if (ids.length === 0) return;
+        event.preventDefault();
+        duplicateTables(ids);
+        return;
+      }
       if (event.key === "Delete" || event.key === "Backspace") {
         const { selectedEdgeId: edgeId, selectedNodeId: nodeId } = useCanvasStore.getState();
         if (edgeId) {
           event.preventDefault();
           useErdStore.getState().deleteRelationship(edgeId);
           selectEdge(null);
-        } else if (nodeId) {
+        } else if (selectedIds.length > 1) {
           event.preventDefault();
-          useErdStore.getState().deleteTable(nodeId);
+          useErdStore.getState().deleteTables(selectedIds);
+          selectNode(null);
+        } else if (nodeId || selectedIds.length === 1) {
+          event.preventDefault();
+          useErdStore.getState().deleteTable(nodeId ?? selectedIds[0]);
           selectNode(null);
         }
       }
     };
+    const onCopy = (event: ClipboardEvent) => {
+      if (replaying || isTypingTarget(event.target)) return;
+      const ids = useCanvasStore.getState().nodes.filter((n) => n.selected).map((n) => n.id);
+      const erd = useErdStore.getState().erd;
+      if (!erd || ids.length === 0 || !event.clipboardData) return;
+      event.preventDefault();
+      event.clipboardData.setData("text/plain", JSON.stringify({ episteme: "tables", ...copyTables(erd, ids) }));
+    };
+    const onPaste = (event: ClipboardEvent) => {
+      if (replaying || isTypingTarget(event.target)) return;
+      const text = event.clipboardData?.getData("text/plain");
+      if (!text || !text.includes('"episteme":"tables"')) return;
+      try {
+        const clip = JSON.parse(text) as TableClipboard & { episteme: string };
+        event.preventDefault();
+        selectPasted(useErdStore.getState().pasteTables(clip, { x: 48, y: 48 }));
+      } catch {
+        /* not ours */
+      }
+    };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("copy", onCopy);
+    window.addEventListener("paste", onPaste);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("copy", onCopy);
+      window.removeEventListener("paste", onPaste);
+    };
   }, [replaying, selectEdge, selectNode]);
 
   const hasSchema = Boolean(viewErd);
@@ -198,8 +248,9 @@ export function ERDCanvas() {
       >
         <CanvasAutoFit />
         {hasSchema && <CanvasToolbar disabled={replaying} />}
+        {!replaying && <SelectionBar />}
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="var(--dots)" />
-        <Controls position="bottom-right" showInteractive={false} />
+        <Controls position="bottom-right" showInteractive={false} className="max-md:!mb-20" />
         {nodes.length >= 4 && (
           <MiniMap
             position="bottom-left"
@@ -207,7 +258,8 @@ export function ERDCanvas() {
             zoomable
             nodeStrokeColor={(node) => (node.id === selectedNodeId ? "var(--accent-blue)" : "var(--border)")}
             nodeBorderRadius={4}
-                        style={{ width: 140, height: 88 }}
+            className="max-md:!hidden"
+            style={{ width: 140, height: 88 }}
           />
         )}
       </ReactFlow>

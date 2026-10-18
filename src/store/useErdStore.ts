@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { temporal } from "zundo";
-import type { ERD } from "@/types/erd";
+import type { ERD, TableColor } from "@/types/erd";
 import {
   EMPTY_ERD,
   importErd,
@@ -19,6 +19,9 @@ import {
   addRelationship as addRelationshipOp,
   updateRelationship as updateRelationshipOp,
   deleteRelationship as deleteRelationshipOp,
+  setTableColor as setTableColorOp,
+  pasteTables as pasteTablesOp,
+  type TableClipboard,
   type ColumnPatch,
   type EditResult,
   type RelationshipPatch,
@@ -60,6 +63,9 @@ interface ErdState {
   addRelationship: (args: { fromTableId: string; toTableId: string; fromColumn?: string | null; toColumn?: string | null }) => string | null;
   updateRelationship: (relationshipId: string, patch: RelationshipPatch) => boolean;
   deleteRelationship: (relationshipId: string) => void;
+  deleteTables: (tableIds: string[]) => void;
+  setTableColor: (tableIds: string[], color: TableColor | null) => void;
+  pasteTables: (clip: TableClipboard, offset: XY) => string[];
 }
 
 export const useErdStore = create<ErdState>()(
@@ -130,6 +136,31 @@ export const useErdStore = create<ErdState>()(
           addRelationship: (args) => commit(addRelationshipOp(current(), args))?.relationshipId ?? null,
           updateRelationship: (id, patch) => Boolean(commit(updateRelationshipOp(current(), id, patch))),
           deleteRelationship: (id) => void commit(deleteRelationshipOp(current(), id)),
+          deleteTables: (tableIds) => {
+            let erd = current();
+            for (const id of tableIds) {
+              const result = deleteTableOp(erd, id);
+              if (result.ok) erd = result.erd;
+            }
+            const positions = { ...get().positions };
+            tableIds.forEach((id) => delete positions[id]);
+            set({ erd, positions, lastError: null });
+          },
+          setTableColor: (tableIds, color) => void commit(setTableColorOp(current(), tableIds, color)),
+          pasteTables: (clip, offset) => {
+            const result = pasteTablesOp(current(), clip);
+            if (!result.ok) {
+              set({ lastError: result.error });
+              return [];
+            }
+            const positions = { ...get().positions };
+            for (const [oldId, newId] of Object.entries(result.idMap)) {
+              const from = positions[oldId] ?? { x: 0, y: 0 };
+              positions[newId] = { x: from.x + offset.x, y: from.y + offset.y };
+            }
+            set({ erd: result.erd, positions, lastError: null });
+            return Object.values(result.idMap);
+          },
         };
       },
       {

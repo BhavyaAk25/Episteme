@@ -5,6 +5,7 @@ import { useErdStore } from "@/store/useErdStore";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
 import { isColumnUnique } from "@/lib/erd/model";
+import { TABLE_COLORS, TABLE_COLOR_NAMES } from "@/lib/erd/colors";
 import type { Table } from "@/types/erd";
 import { CommitInput, FlagToggle, SectionHeader, SmallButton, TypeOptions } from "./fields";
 
@@ -174,6 +175,21 @@ export function TableEditor({ table }: { table: Table }) {
         onCommit={(name) => renameTable(table.id, name)}
       />
       {description && <p className="mt-1 text-[12px] text-muted leading-snug">{description}</p>}
+      <div className="mt-3 flex items-center gap-1.5" role="radiogroup" aria-label="Table color">
+        <span className="text-[11px] text-muted mr-1">Color</span>
+        {TABLE_COLOR_NAMES.map((color) => (
+          <button
+            key={color}
+            role="radio"
+            aria-checked={table.color === color}
+            aria-label={color}
+            title={color}
+            onClick={() => useErdStore.getState().setTableColor([table.id], table.color === color ? null : color)}
+            className={`w-5 h-5 rounded-full border-2 transition-transform ${table.color === color ? "border-foreground scale-110" : "border-transparent"}`}
+            style={{ background: TABLE_COLORS[color] }}
+          />
+        ))}
+      </div>
 
       <SectionHeader
         title={`Columns (${table.columns.length})`}

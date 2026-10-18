@@ -5,6 +5,8 @@ import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { ERDNodeData } from "@/types/erd";
 import { columnHandleId } from "@/lib/ontology/transformer";
 import { useErdStore } from "@/store/useErdStore";
+import { useUIStore } from "@/store/useUIStore";
+import { TABLE_COLORS } from "@/lib/erd/colors";
 
 /** In-place name editor: Enter or blur saves, Escape cancels. */
 function InlineName({ value, onSave, onDone, className }: { value: string; onSave: (next: string) => void; onDone: () => void; className: string }) {
@@ -62,6 +64,11 @@ function ERDTableNodeComponent({ id, data, selected, draggable }: NodeProps) {
   const nodeData = data as ERDNodeData;
   const editable = draggable !== false && !nodeData.diff;
   const [editing, setEditing] = useState<{ kind: "table" } | { kind: "column"; name: string } | null>(null);
+  const detail = useUIStore((state) => state.nodeDetail);
+  const visibleColumns =
+    detail === "full" ? nodeData.columns : detail === "keys" ? nodeData.columns.filter((c) => c.isPrimaryKey || c.isForeignKey) : [];
+  const hiddenCount = nodeData.columns.length - visibleColumns.length;
+  const accent = nodeData.color ? TABLE_COLORS[nodeData.color] : null;
   const unique = new Set(nodeData.uniqueColumns ?? []);
   const footerConstraints = nodeData.constraints.filter(
     (c) => c.type === "CHECK" || (c.type === "UNIQUE" && c.columns.length > 1)
@@ -84,7 +91,11 @@ function ERDTableNodeComponent({ id, data, selected, draggable }: NodeProps) {
               ? "border-accent shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent-blue)_22%,transparent)]"
               : "border-foreground/[0.12] hover:border-foreground/[0.22] shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
       }`}
+      style={accent ? { borderTopColor: accent, borderTopWidth: 4 } : undefined}
     >
+      {/* Table-level connection points, used when columns are hidden (compact views). */}
+      <Handle type="source" position={Position.Left} id={columnHandleId("__table", "L")} className={`${handleClass} !top-5`} />
+      <Handle type="source" position={Position.Right} id={columnHandleId("__table", "R")} className={`${handleClass} !top-5`} />
       {nodeData.diff && (
         <span
           className={`absolute -top-2.5 right-3 px-1.5 py-px rounded text-[10px] font-semibold text-canvas ${
@@ -122,11 +133,11 @@ function ERDTableNodeComponent({ id, data, selected, draggable }: NodeProps) {
         <span className="ml-auto text-[10px] text-muted font-mono">{nodeData.columns.length} cols</span>
       </div>
 
-      <div className="py-1">
+      <div className={detail === "names" ? "hidden" : "py-1"}>
         {nodeData.columns.length === 0 && (
           <div className="px-3.5 py-1.5 text-[11px] text-muted italic">No columns</div>
         )}
-        {nodeData.columns.map((col) => (
+        {visibleColumns.map((col) => (
           <div key={col.name} className="relative flex items-center gap-2 px-3.5 py-[5px] hover:bg-node-header/50">
             <Handle type="source" position={Position.Left} id={columnHandleId(col.name, "L")} className={handleClass} />
             <span className="w-4 h-4 flex items-center justify-center shrink-0">
@@ -163,7 +174,11 @@ function ERDTableNodeComponent({ id, data, selected, draggable }: NodeProps) {
         ))}
       </div>
 
-      {footerConstraints.length > 0 && (
+      {hiddenCount > 0 && detail !== "names" && (
+        <div className="px-3.5 pb-1.5 -mt-0.5 text-[10px] text-muted">+{hiddenCount} more column{hiddenCount === 1 ? "" : "s"}</div>
+      )}
+
+      {detail === "full" && footerConstraints.length > 0 && (
         <div className="px-3.5 py-1.5 border-t border-foreground/[0.06] bg-foreground/[0.02] space-y-1 rounded-b-[9px]">
           {footerConstraints.slice(0, 3).map((constraint, idx) => (
             <div key={idx} className="flex items-center gap-1.5 text-[10px] text-muted">

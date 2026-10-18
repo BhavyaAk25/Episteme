@@ -12,10 +12,15 @@ const mod = isMac ? "⌘" : "Ctrl";
 const SHORTCUTS: Array<[string, string]> = [
   [`${mod} + Enter`, "Generate from the description"],
   ["/", "Focus the description box"],
-  [`${mod} + K`, "Ask AI to change the schema"],
+  [`${mod} + K`, "Search tables and commands"],
   [`${mod} + Z`, "Undo"],
   [isMac ? "⌘ + ⇧ + Z" : "Ctrl + Y", "Redo"],
-  ["Delete / Backspace", "Delete the selected table or relationship"],
+  ["Delete / Backspace", "Delete the selected tables or relationship"],
+  ["Shift + drag", "Select several tables"],
+  [`${mod} + A`, "Select all tables"],
+  [`${mod} + C / V`, "Copy / paste tables"],
+  [`${mod} + D`, "Duplicate selected tables"],
+  ["Double-click a name", "Rename a table or column"],
   ["Esc", "Close dialogs and menus"],
   ["?", "Show this list"],
 ];
@@ -31,11 +36,6 @@ export function ShortcutsDialog() {
         return;
       }
       const mod = event.metaKey || event.ctrlKey;
-      if (mod && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        document.querySelector<HTMLInputElement>('input[aria-label="Ask AI to change the schema"]')?.focus();
-        return;
-      }
       if (isTyping(event.target) || mod || event.altKey) return;
       if (event.key === "?") {
         event.preventDefault();
@@ -57,7 +57,7 @@ export function ShortcutsDialog() {
           <h2 className="text-[15px] font-semibold text-foreground">Keyboard shortcuts</h2>
           <button onClick={() => setShortcutsOpen(false)} aria-label="Close" className="w-8 h-8 rounded-lg text-muted hover:text-foreground hover:bg-foreground/5">×</button>
         </div>
-        <ul className="p-3">
+        <ul className="p-3 max-h-[60vh] overflow-y-auto">
           {SHORTCUTS.map(([keys, action]) => (
             <li key={keys} className="flex items-center justify-between gap-4 px-2 py-1.5 text-[13px]">
               <span className="text-foreground">{action}</span>
@@ -65,6 +65,17 @@ export function ShortcutsDialog() {
             </li>
           ))}
         </ul>
+        <div className="px-5 py-3 border-t border-border">
+          <button
+            onClick={() => {
+              setShortcutsOpen(false);
+              useUIStore.getState().setTourOpen(true);
+            }}
+            className="text-[12px] text-accent hover:underline"
+          >
+            Take the 4-step tour
+          </button>
+        </div>
       </div>
     </div>
   );

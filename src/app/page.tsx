@@ -11,10 +11,13 @@ import { RightInspector } from "@/components/inspector/RightInspector";
 import { VerifyPanel } from "@/components/verify/VerifyPanel";
 import { ExportModal } from "@/components/export/ExportModal";
 import { NoticeToast } from "@/components/shared/NoticeToast";
+import { SmallScreenHint } from "@/components/shared/SmallScreenHint";
 import { ImportModal } from "@/components/import/ImportModal";
 import { ShortcutsDialog } from "@/components/shared/ShortcutsDialog";
+import { CommandPalette } from "@/components/shared/CommandPalette";
+import { Tour } from "@/components/shared/Tour";
 import { useProjectStore } from "@/store/useProjectStore";
-import { useUIStore } from "@/store/useUIStore";
+import { useUIStore, hydrateUIPreferences } from "@/store/useUIStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
 import { useErdStore } from "@/store/useErdStore";
 import { useSimulationStore } from "@/store/useSimulationStore";
@@ -39,6 +42,7 @@ export default function Home() {
 
   // Restore the last session from localStorage on mount.
   useEffect(() => {
+    hydrateUIPreferences();
     let cancelled = false;
     void Promise.all([
       Promise.resolve(useProjectStore.persist.rehydrate()),
@@ -164,8 +168,11 @@ export default function Home() {
       {/* Export Modal */}
       <ExportModal />
       <NoticeToast />
+      <SmallScreenHint />
       <ImportModal />
       <ShortcutsDialog />
+      <CommandPalette />
+      <Tour />
 
       {/* Error Modal */}
       <AnimatePresence>
