@@ -86,7 +86,7 @@ function envInt(name: string, fallback: number, min: number, max: number): numbe
   return Math.max(min, Math.min(max, parsed));
 }
 
-const DEFAULT_GENERATE_MAX_RETRIES = envInt("GEMINI_MAX_RETRIES_GENERATE", 1, 0, 5);
+const DEFAULT_GENERATE_MAX_RETRIES = envInt("GEMINI_MAX_RETRIES_GENERATE", 2, 0, 5);
 const DEFAULT_AUTOFIX_MAX_RETRIES = envInt("GEMINI_MAX_RETRIES_AUTOFIX", 1, 0, 3);
 // Gemini 3's thinking tokens count toward the output budget, so leave room.
 const DEFAULT_GENERATE_MAX_OUTPUT_TOKENS = envInt("GEMINI_GENERATE_MAX_OUTPUT_TOKENS", 16384, 512, 65536);
@@ -158,6 +158,21 @@ function isQuotaOrRateLimitError(message: string): boolean {
     lower.includes("quota") ||
     lower.includes("429") ||
     lower.includes("rate limit")
+  );
+}
+
+/** Brief server-side problems worth retrying: overloaded, 5xx, dropped connections. */
+export function isTransientError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("unavailable") ||
+    lower.includes("overloaded") ||
+    lower.includes("high demand") ||
+    lower.includes("internal error") ||
+    lower.includes("deadline") ||
+    lower.includes("fetch failed") ||
+    lower.includes("econnreset") ||
+    /\b50[0234]\b/.test(lower)
   );
 }
 
@@ -444,6 +459,13 @@ export async function callGemini(
         }
       }
 
+      if (isTransientError(lastError.message) && attempt < totalAttempts - 1) {
+        const backoff = retryDelay * 2 ** attempt;
+        console.warn(`Gemini temporarily unavailable. Retry ${attempt + 1}/${totalAttempts - 1} in ${backoff}ms.`);
+        await new Promise((resolve) => setTimeout(resolve, backoff));
+        continue;
+      }
+
       throw normalizeGeminiError(lastError);
     }
   }
@@ -493,7 +515,18 @@ export async function* streamGemini(
   if (thinkingConfig && MODEL_NAME.startsWith("gemini-3")) config.thinkingConfig = thinkingConfig;
 
   try {
-    const stream = await genai.models.generateContentStream({ model: MODEL_NAME, contents: prompt, config });
+    // Retry brief outages, but only before any text has been streamed.
+    let stream: Awaited<ReturnType<typeof genai.models.generateContentStream>> | null = null;
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        stream = await genai.models.generateContentStream({ model: MODEL_NAME, contents: prompt, config });
+        break;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (attempt >= 2 || !isTransientError(message)) throw error;
+        await new Promise((resolve) => setTimeout(resolve, DEFAULT_RETRY_DELAY_MS * 2 ** attempt));
+      }
+    }
     let finishReason: string | undefined;
     for await (const chunk of stream) {
       const text = chunk.text;
