@@ -186,6 +186,7 @@ export function ERDCanvas() {
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         connectionMode={ConnectionMode.Loose}
+        zoomOnDoubleClick={false}
         nodesConnectable={!replaying}
         deleteKeyCode={null}
         connectionLineStyle={{ stroke: "var(--accent-blue)", strokeWidth: 2 }}
@@ -199,14 +200,14 @@ export function ERDCanvas() {
         {hasSchema && <CanvasToolbar disabled={replaying} />}
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="var(--dots)" />
         <Controls position="bottom-right" showInteractive={false} />
-        {nodes.length > 1 && (
+        {nodes.length >= 4 && (
           <MiniMap
             position="bottom-left"
             pannable
             zoomable
             nodeStrokeColor={(node) => (node.id === selectedNodeId ? "var(--accent-blue)" : "var(--border)")}
             nodeBorderRadius={4}
-                        style={{ width: 176, height: 112 }}
+                        style={{ width: 140, height: 88 }}
           />
         )}
       </ReactFlow>

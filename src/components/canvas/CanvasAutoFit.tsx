@@ -8,7 +8,7 @@ import { useUIStore } from "@/store/useUIStore";
 // Leave room for the toolbar (top) and the replay bar, minimap and zoom
 // controls (bottom) so they never sit on top of tables after a fit.
 export const CANVAS_FIT_OPTIONS: FitViewOptions = {
-  padding: { top: "72px", right: "48px", bottom: "150px", left: "48px" },
+  padding: { top: "80px", right: "48px", bottom: "110px", left: "48px" },
   maxZoom: 1.1,
 };
 

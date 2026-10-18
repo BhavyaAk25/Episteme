@@ -89,6 +89,10 @@ interface ProjectsState {
   projects: ProjectMeta[];
   versions: Version[];
   ready: boolean;
+  /** Autosave status for the open project, shown in the top bar. */
+  saveState: "idle" | "pending" | "saving" | "saved" | "error";
+  lastSavedAt: number | null;
+  markPending: () => void;
 
   init: () => Promise<void>;
   saveCurrent: () => Promise<void>;
@@ -112,6 +116,10 @@ export const useProjectsStore = create<ProjectsState>()(
       projects: [],
       versions: [],
       ready: false,
+      saveState: "idle",
+      lastSavedAt: null,
+
+      markPending: () => set({ saveState: "pending" }),
 
       init: async () => {
         let { currentProjectId, projects } = get();
@@ -143,14 +151,19 @@ export const useProjectsStore = create<ProjectsState>()(
         const { currentProjectId, projects } = get();
         if (!currentProjectId) return;
         const data = snapshot();
+        set({ saveState: "saving" });
         try {
           await idbSet(projectKey(currentProjectId), data);
         } catch {
+          set({ saveState: "error" });
           return;
         }
+        const now = Date.now();
         set({
+          saveState: "saved",
+          lastSavedAt: now,
           projects: projects.map((p) =>
-            p.id === currentProjectId ? { ...p, updatedAt: Date.now(), tableCount: data.erd?.tables.length ?? 0 } : p
+            p.id === currentProjectId ? { ...p, updatedAt: now, tableCount: data.erd?.tables.length ?? 0 } : p
           ),
         });
       },

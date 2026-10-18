@@ -35,7 +35,8 @@ export function CanvasControls() {
     setCurrentBuildStep(0);
   };
 
-  if (totalSteps === 0 || previewing) {
+  // Only visible during a replay; start it from the toolbar's Replay button.
+  if (totalSteps === 0 || previewing || !active) {
     return null;
   }
 

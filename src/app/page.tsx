@@ -97,6 +97,7 @@ export default function Home() {
     let timer: number | undefined;
     const schedule = () => {
       if (!useProjectsStore.getState().ready) return;
+      useProjectsStore.getState().markPending();
       window.clearTimeout(timer);
       timer = window.setTimeout(() => void useProjectsStore.getState().saveCurrent(), 800);
     };

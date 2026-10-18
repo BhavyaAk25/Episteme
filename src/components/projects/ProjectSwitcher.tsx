@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useProjectsStore } from "@/store/useProjectsStore";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useUIStore } from "@/store/useUIStore";
+import { TEMPLATES, loadTemplate } from "@/lib/actions/templates";
 
 function timeAgo(timestamp: number): string {
   const seconds = Math.round((Date.now() - timestamp) / 1000);
@@ -103,7 +104,24 @@ export function ProjectSwitcher() {
             ))}
           </div>
 
-          <div className="p-2 border-t border-border flex items-center justify-between gap-2">
+          <div className="px-2 pt-2 border-t border-border">
+            <p className="px-1 pb-1 ui-section-title">New from template</p>
+            <div className="flex flex-wrap gap-1 pb-2">
+              {TEMPLATES.map((template) => (
+                <button
+                  key={template.id}
+                  onClick={() => {
+                    setOpen(false);
+                    void loadTemplate(template.id, { newProject: true });
+                  }}
+                  className="h-7 px-2.5 rounded-md border border-border text-[12px] text-foreground hover:bg-foreground/5"
+                >
+                  {template.title}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="p-2 border-t border-border flex flex-wrap items-center justify-between gap-2">
             <button
               onClick={() => {
                 setOpen(false);

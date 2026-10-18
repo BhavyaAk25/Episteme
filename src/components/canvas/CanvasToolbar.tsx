@@ -6,6 +6,7 @@ import { useStore } from "zustand";
 import { useErdStore, undoErd, redoErd } from "@/store/useErdStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
 import { useUIStore } from "@/store/useUIStore";
+import { useProjectStore } from "@/store/useProjectStore";
 import { layoutErd } from "@/lib/erd/layout";
 import { HistoryPanel } from "@/components/projects/HistoryPanel";
 
@@ -137,6 +138,19 @@ export function CanvasToolbar({ disabled }: { disabled: boolean }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5h6v5H4zM14 14h6v5h-6zM14 5h6v5h-6zM10 7.5h4M17 10v4" />
           </svg>
           {tidying ? "Arranging…" : "Tidy up"}
+        </ToolButton>
+        <ToolButton
+          onClick={() => {
+            useProjectStore.getState().setCurrentBuildStep(0);
+            useProjectStore.getState().setIsPlaying(true);
+          }}
+          disabled={disabled || !hasTables}
+          title="Replay how this schema is built"
+        >
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M6.3 4.2A1 1 0 004.8 5v10a1 1 0 001.5.8l8-5a1 1 0 000-1.6l-8-5z" />
+          </svg>
+          Replay
         </ToolButton>
         <span className="w-px h-5 bg-border mx-1" />
         <ToolButton onClick={() => setHistoryOpen(!historyOpen)} disabled={disabled} title="Version history">
