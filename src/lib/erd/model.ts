@@ -473,6 +473,23 @@ export interface ColumnPatch {
   generated?: string | null;
 }
 
+/** "((a + b))" -> "a + b", but "length(x) + (y)" stays as it is. */
+function stripOuterParens(text: string): string {
+  let result = text.trim();
+  const wraps = (t: string) => {
+    if (!t.startsWith("(") || !t.endsWith(")")) return false;
+    let depth = 0;
+    for (let i = 0; i < t.length; i += 1) {
+      if (t[i] === "(") depth += 1;
+      else if (t[i] === ")") depth -= 1;
+      if (depth === 0 && i < t.length - 1) return false;
+    }
+    return depth === 0;
+  };
+  while (wraps(result)) result = result.slice(1, -1).trim();
+  return result;
+}
+
 export function updateColumn(erd: ERD, tableId: string, columnName: string, patch: ColumnPatch): EditResult {
   const table = findTable(erd, tableId);
   const column = table?.columns.find((c) => c.name === columnName);
@@ -518,7 +535,7 @@ export function updateColumn(erd: ERD, tableId: string, columnName: string, patc
   if (patch.defaultValue !== undefined && patch.defaultValue !== null && patch.defaultValue.includes(";")) {
     return { ok: false, error: "Default values can't contain semicolons." };
   }
-  const generated = patch.generated === undefined ? undefined : patch.generated?.trim().replace(/^\(|\)$/g, "").trim() || null;
+  const generated = patch.generated === undefined ? undefined : stripOuterParens(patch.generated?.trim() ?? "") || null;
   if (generated) {
     if (generated.includes(";")) return { ok: false, error: "Generated expressions can't contain semicolons." };
     if (patch.isPrimaryKey ?? column.isPrimaryKey) return { ok: false, error: "A primary key can't be a generated column." };
