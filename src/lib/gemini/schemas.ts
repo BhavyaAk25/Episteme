@@ -262,6 +262,7 @@ const EditOpSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("drop_foreign_key"), from_table: z.string().min(1), from_column: z.string().min(1) }),
   z.object({ op: z.literal("add_index"), table: z.string().min(1), columns: z.array(z.string()).min(1), unique: optionalFlag }),
   z.object({ op: z.literal("add_check"), table: z.string().min(1), expression: z.string().min(1) }),
+  z.object({ op: z.literal("drop_check"), table: z.string().min(1), expression: z.string().min(1) }),
   z.object({ op: z.literal("create_enum"), name: z.string().min(1), values: z.array(z.union([z.string(), z.number()]).transform(String)).min(1) }),
   z.object({ op: z.literal("set_comment"), table: z.string().min(1), column: optionalText, comment: z.string().nullish().transform((v) => v ?? "") }),
   z.object({ op: z.literal("create_view"), name: z.string().min(1), sql: z.string().min(1) }),

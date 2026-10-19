@@ -4,6 +4,10 @@ import { useErdStore, type XY } from "./useErdStore";
 import { applyOps, describeErdForAi, type EditOp, type OpResult } from "@/lib/erd/applyOps";
 import { EMPTY_ERD } from "@/lib/erd/model";
 import { estimateNodeHeight } from "@/lib/ontology/transformer";
+import type { Issue } from "@/lib/verify/linter";
+import { checkFix, guardFixOps, problemText, type FixVerdict } from "@/lib/verify/fixCheck";
+import { useProjectStore } from "./useProjectStore";
+import { useSimulationStore } from "./useSimulationStore";
 
 export interface EditDiff {
   addedTableIds: string[];
@@ -24,8 +28,13 @@ interface AiEditState {
   previewPositions: Record<string, XY>;
   diff: EditDiff;
   error: string | null;
+  /** The issue being fixed ("Ask AI to fix"), and whether the fix was checked to work. */
+  fixing: Issue | null;
+  verdict: FixVerdict | null;
 
   request: (instruction: string) => Promise<void>;
+  /** Fix one issue: ask, guard, apply to a preview, check it, retry once with feedback. */
+  requestFix: (issue: Issue) => Promise<void>;
   accept: () => void;
   discard: () => void;
 }
@@ -78,12 +87,95 @@ export const useAiEditStore = create<AiEditState>((set, get) => ({
   previewPositions: {},
   diff: EMPTY_DIFF,
   error: null,
+  fixing: null,
+  verdict: null,
+
+  requestFix: async (issue) => {
+    if (get().status === "loading") return;
+    set({
+      status: "loading",
+      instruction: `Fix: ${issue.title}`,
+      fixing: issue,
+      verdict: null,
+      error: null,
+      summary: "",
+      results: [],
+      previewErd: null,
+      diff: EMPTY_DIFF,
+    });
+    const run = useSimulationStore.getState().run;
+    const failingBefore = (run?.tests.filter((t) => t.status === "fail").length ?? 0) + (run?.ddlProblems.length ?? 0);
+    let previousAttempt: string | undefined;
+    let best: { previewErd: ERD; results: OpResult[]; summary: string; verdict: FixVerdict } | null = null;
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const base = useErdStore.getState().erd ?? EMPTY_ERD;
+      let payload: { summary?: string; operations?: EditOp[]; error?: string };
+      try {
+        const response = await fetch("/api/edit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ instruction: problemText(issue), schemaText: describeErdForAi(base), mode: "fix", previousAttempt }),
+        });
+        payload = await response.json();
+        if (!response.ok) {
+          if (best) break;
+          set({ status: "error", fixing: null, error: payload.error ?? `AI fix failed (HTTP ${response.status}).` });
+          return;
+        }
+      } catch {
+        if (best) break;
+        set({ status: "error", fixing: null, error: "Couldn't reach the server. Check your connection and try again." });
+        return;
+      }
+
+      const { allowed, blocked } = guardFixOps(payload.operations ?? [], issue);
+      const applied = applyOps(base, allowed);
+      const results = [...applied.results, ...blocked];
+      const stepFailures = applied.results.filter((r) => !r.ok);
+
+      let verdict: FixVerdict;
+      let previewErd = applied.erd;
+      if (allowed.length === 0) {
+        verdict = { resolved: false, message: payload.summary || "The AI didn't propose a fix." };
+        previewErd = base;
+      } else if (stepFailures.length > 0) {
+        // Never half-apply a fix: show nothing changed and try again.
+        verdict = { resolved: false, message: `${stepFailures.length} step${stepFailures.length === 1 ? "" : "s"} couldn't be applied (${stepFailures[0].error}).` };
+        previewErd = base;
+      } else {
+        set({ summary: attempt === 0 ? "Checking the proposed fix…" : "Checking the second attempt…" });
+        verdict = await checkFix(issue, base, applied.erd, useProjectStore.getState().prompt, failingBefore);
+      }
+
+      const candidate = { previewErd, results, summary: payload.summary ?? "", verdict };
+      if (!best || verdict.resolved || (previewErd !== base && best.previewErd === base)) best = candidate;
+      if (verdict.resolved) break;
+      previousAttempt = [
+        `Your operations: ${results.map((r) => `${r.label}${r.ok ? "" : ` (${r.error})`}`).join("; ") || "none"}.`,
+        `Result: ${verdict.message}`,
+      ].join("\n");
+    }
+
+    if (!best) return;
+    const latest = useErdStore.getState().erd ?? EMPTY_ERD;
+    const diff = computeDiff(latest, best.previewErd);
+    set({
+      status: "preview",
+      summary: best.summary || (best.verdict.resolved ? "Proposed fix." : "The AI couldn't find a fix that works."),
+      results: best.results,
+      previewErd: best.previewErd,
+      verdict: best.verdict,
+      diff,
+      previewPositions: placeNewTables(best.previewErd, diff.addedTableIds, useErdStore.getState().positions),
+    });
+  },
 
   request: async (instruction) => {
     const trimmed = instruction.trim();
     if (!trimmed || get().status === "loading") return;
     const base = useErdStore.getState().erd ?? EMPTY_ERD;
-    set({ status: "loading", instruction: trimmed, error: null, summary: "", results: [], previewErd: null, diff: EMPTY_DIFF });
+    set({ status: "loading", instruction: trimmed, error: null, summary: "", results: [], previewErd: null, diff: EMPTY_DIFF, fixing: null, verdict: null });
 
     let payload: { summary?: string; operations?: EditOp[]; error?: string };
     try {
@@ -124,9 +216,9 @@ export const useAiEditStore = create<AiEditState>((set, get) => ({
     const { positions, erd } = useErdStore.getState();
     if (!erd) useErdStore.getState().startBlank();
     useErdStore.getState().loadErd(previewErd, { ...positions, ...previewPositions });
-    set({ status: "idle", previewErd: null, previewPositions: {}, results: [], summary: "", diff: EMPTY_DIFF, instruction: "" });
+    set({ status: "idle", previewErd: null, previewPositions: {}, results: [], summary: "", diff: EMPTY_DIFF, instruction: "", fixing: null, verdict: null });
   },
 
   discard: () =>
-    set({ status: "idle", previewErd: null, previewPositions: {}, results: [], summary: "", diff: EMPTY_DIFF, error: null }),
+    set({ status: "idle", previewErd: null, previewPositions: {}, results: [], summary: "", diff: EMPTY_DIFF, error: null, fixing: null, verdict: null }),
 }));

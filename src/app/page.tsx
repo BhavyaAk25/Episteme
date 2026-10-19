@@ -121,16 +121,34 @@ export default function Home() {
     };
   }, []);
 
-  // Simulation results describe one version of the schema; clear them on edit.
-  useEffect(
-    () =>
-      useErdStore.subscribe((state, previous) => {
-        if (state.erd !== previous.erd && useSimulationStore.getState().run) {
-          useSimulationStore.getState().reset();
+  // Simulation results describe one version of the schema. On edit, clear
+  // them, and if tests had been run, run them again once editing pauses so
+  // the Checks panel never shows results for an older schema.
+  useEffect(() => {
+    let timer: number | undefined;
+    const unsubscribe = useErdStore.subscribe((state, previous) => {
+      if (state.erd === previous.erd) return;
+      const simulation = useSimulationStore.getState();
+      const hadResults = Boolean(simulation.run) || timer !== undefined;
+      if (simulation.run) simulation.reset();
+      if (!hadResults || !state.erd?.tables.length) return;
+      window.clearTimeout(timer);
+      const rerun = () => {
+        // A run already in progress is for the old schema: wait for it, then run again.
+        if (useSimulationStore.getState().isRunning) {
+          timer = window.setTimeout(rerun, 500);
+          return;
         }
-      }),
-    []
-  );
+        timer = undefined;
+        void useSimulationStore.getState().runTests();
+      };
+      timer = window.setTimeout(rerun, 1200);
+    });
+    return () => {
+      window.clearTimeout(timer);
+      unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

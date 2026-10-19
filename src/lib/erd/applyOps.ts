@@ -13,6 +13,7 @@ import {
   deleteColumn,
   deleteRelationship,
   deleteTable,
+  removeConstraint,
   renameTable,
   setTableComment,
   updateColumn,
@@ -62,6 +63,7 @@ export type EditOp =
   | { op: "drop_foreign_key"; from_table: string; from_column: string }
   | { op: "add_index"; table: string; columns: string[]; unique?: boolean }
   | { op: "add_check"; table: string; expression: string }
+  | { op: "drop_check"; table: string; expression: string }
   | { op: "create_enum"; name: string; values: string[] }
   | { op: "set_comment"; table: string; column?: string; comment: string }
   | { op: "create_view"; name: string; sql: string };
@@ -71,6 +73,10 @@ export interface OpResult {
   ok: boolean;
   error?: string;
 }
+
+/** Compare CHECK expressions ignoring spacing, case and wrapping parentheses. */
+const normalizeExpression = (expression: string) =>
+  expression.toLowerCase().replace(/[\s()]+/g, "");
 
 const tableId = (erd: ERD, name: string) => erd.tables.find((t) => t.name === name)?.id;
 
@@ -105,6 +111,8 @@ function describe(op: EditOp): string {
       return `Index ${op.table} (${op.columns.join(", ")})${op.unique ? " UNIQUE" : ""}`;
     case "add_check":
       return `Check on ${op.table}: ${op.expression}`;
+    case "drop_check":
+      return `Remove check on ${op.table}: ${op.expression}`;
     case "create_enum":
       return `Enum type ${op.name} (${op.values.join(", ")})`;
     case "set_comment":
@@ -211,6 +219,14 @@ function applyOne(erd: ERD, op: EditOp): EditResult {
     case "add_check": {
       const id = tableId(erd, op.table);
       return id ? addCheckConstraint(erd, id, op.expression) : missingTable(op.table);
+    }
+    case "drop_check": {
+      const table = erd.tables.find((t) => t.name === op.table);
+      if (!table) return missingTable(op.table);
+      const wanted = normalizeExpression(op.expression);
+      const index = table.constraints.findIndex((c) => c.type === "CHECK" && c.expression && normalizeExpression(c.expression) === wanted);
+      if (index < 0) return { ok: false, error: `${op.table} has no CHECK (${op.expression}).` };
+      return removeConstraint(erd, table.id, index);
     }
     case "create_enum":
       return upsertEnum(erd, op.name, op.values, erd.enums?.some((e) => e.name === op.name) ? op.name : undefined);

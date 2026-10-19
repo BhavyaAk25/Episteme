@@ -5,7 +5,6 @@ import { useErdStore } from "@/store/useErdStore";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useSimulationStore } from "@/store/useSimulationStore";
 import { useAiEditStore } from "@/store/useAiEditStore";
-import { useUIStore } from "@/store/useUIStore";
 import { applyOps } from "@/lib/erd/applyOps";
 import { lintErd, type Issue } from "./linter";
 import { promptCoverage } from "./coverage";
@@ -25,7 +24,8 @@ export function useIssues(): Issue[] {
         table: problem.table,
         title: `Postgres rejected the SQL${problem.table ? ` for ${problem.table}` : ""}`,
         detail: problem.error,
-        askAi: `Fix this PostgreSQL error${problem.table ? ` in table ${problem.table}` : ""}: "${problem.error}". The failing statement was: ${problem.statement.slice(0, 400)}`,
+        askAi: `Fix this PostgreSQL error${problem.table ? ` in table ${problem.table}` : ""}: "${problem.error}".`,
+        context: `Failing statement:\n${problem.statement.slice(0, 800)}`,
       })),
       ...(run?.tests ?? [])
         .filter((test) => test.status === "fail")
@@ -36,6 +36,8 @@ export function useIssues(): Issue[] {
           title: `Test failed: ${test.title}`,
           detail: test.detail ?? "",
           askAi: `A database test failed for table ${test.table}: "${test.title}" — ${test.detail}. Fix the schema so it behaves correctly.`,
+          context: `Test SQL that ran:\n${test.sql.slice(0, 800)}\nPostgres said: ${test.detail ?? "(nothing)"}`,
+          testTitle: test.title,
         })),
     ];
     const order = { error: 0, warning: 1, info: 2 };
@@ -59,9 +61,8 @@ export function applyIssueFixes(issues: Issue[]): void {
   }
 }
 
-/** Hand an issue to "Ask AI to change…" and show the preview on the canvas. */
+/** Ask the AI to fix one issue; the checked result is previewed on the canvas. */
 export function askAiAboutIssue(issue: Issue): void {
   if (!issue.askAi) return;
-  useUIStore.getState().closeDrawer();
-  void useAiEditStore.getState().request(issue.askAi);
+  void useAiEditStore.getState().requestFix(issue);
 }

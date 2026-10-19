@@ -6,6 +6,7 @@ import { useSimulationStore } from "@/store/useSimulationStore";
 import { useUIStore, type VerifyTab as Tab } from "@/store/useUIStore";
 import { useErdStore } from "@/store/useErdStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
+import { useAiEditStore } from "@/store/useAiEditStore";
 import { useIssues, applyIssueFixes, askAiAboutIssue } from "@/lib/verify/useIssues";
 import { QueryTab } from "./QueryTab";
 import { ResultTable } from "./ResultTable";
@@ -20,6 +21,9 @@ const SEVERITY_STYLE: Record<Severity, { dot: string; label: string }> = {
 };
 
 function IssueRow({ issue }: { issue: Issue }) {
+  const aiBusy = useAiEditStore((s) => s.status === "loading");
+  const fixingThis = useAiEditStore((s) => s.fixing?.id === issue.id && (s.status === "loading" || s.status === "preview"));
+  const fixStatus = useAiEditStore((s) => (s.fixing?.id === issue.id ? s.status : null));
   const tableId = useErdStore((state) => state.erd?.tables.find((t) => t.name === issue.table)?.id);
   const style = SEVERITY_STYLE[issue.severity];
   return (
@@ -52,10 +56,13 @@ function IssueRow({ issue }: { issue: Issue }) {
           </button>
         ) : issue.askAi ? (
           <button
-            onClick={() => askAiAboutIssue(issue)}
-            className="h-7 px-2.5 rounded-md border border-border text-foreground text-[12px] font-medium hover:bg-foreground/[0.04]"
+            onClick={() => fixStatus !== "preview" && askAiAboutIssue(issue)}
+            disabled={aiBusy}
+            title={fixStatus === "preview" ? "The proposed fix is shown on the canvas" : undefined}
+            className="h-7 px-2.5 rounded-md border border-border text-foreground text-[12px] font-medium hover:bg-foreground/[0.04] disabled:opacity-50 inline-flex items-center gap-1.5"
           >
-            Ask AI to fix
+            {fixStatus === "loading" && <span className="w-3 h-3 border-2 border-foreground/30 border-t-foreground rounded-full animate-spin" />}
+            {fixStatus === "loading" ? "Fixing…" : fixingThis ? "Review fix ↗" : "Ask AI to fix"}
           </button>
         ) : null}
       </div>
@@ -106,7 +113,12 @@ export function VerifyPanel() {
   return (
     <div className="shrink-0">
       <div className="h-10 bg-surface/95 border-t border-border px-4 flex items-center gap-4">
-        <button onClick={toggleDrawer} className="flex items-center gap-3 h-full flex-1 min-w-0 text-left" aria-expanded={drawerOpen}>
+        <button
+          onClick={toggleDrawer}
+          className="flex items-center gap-3 h-full flex-1 min-w-0 text-left"
+          aria-expanded={drawerOpen}
+          aria-label={drawerOpen ? "Hide checks" : "Show checks"}
+        >
           <span className="text-[13px] font-semibold text-foreground">Checks</span>
           <span className="flex items-center gap-3 text-[12px]">
             <span className={counts.error ? "text-error font-semibold" : "text-muted"}>{counts.error} error{counts.error === 1 ? "" : "s"}</span>
@@ -120,10 +132,13 @@ export function VerifyPanel() {
                 ? `· Postgres: ${passed} passed${failed ? `, ${failed} failed` : ""}${skipped ? `, ${skipped} skipped` : ""} in ${(run.durationMs / 1000).toFixed(1)}s`
                 : "· Postgres tests not run yet"}
           </span>
+          {/* Inside the button, so the arrow toggles the panel too. */}
+          <span className="ml-auto shrink-0 w-8 h-8 -mr-2 rounded-md flex items-center justify-center text-muted hover:text-foreground hover:bg-foreground/[0.05]">
+            <svg className={`w-4 h-4 transition-transform ${drawerOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+            </svg>
+          </span>
         </button>
-        <svg className={`w-4 h-4 text-muted transition-transform ${drawerOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-        </svg>
       </div>
 
       <AnimatePresence>
