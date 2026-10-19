@@ -3,14 +3,15 @@
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSimulationStore } from "@/store/useSimulationStore";
-import { useUIStore } from "@/store/useUIStore";
+import { useUIStore, type VerifyTab as Tab } from "@/store/useUIStore";
 import { useErdStore } from "@/store/useErdStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
 import { useIssues, applyIssueFixes, askAiAboutIssue } from "@/lib/verify/useIssues";
+import { QueryTab } from "./QueryTab";
+import { ResultTable } from "./ResultTable";
 import type { Issue, Severity } from "@/lib/verify/linter";
 import type { DbTest } from "@/lib/verify/runner";
 
-type Tab = "issues" | "tests" | "data";
 
 const SEVERITY_STYLE: Record<Severity, { dot: string; label: string }> = {
   error: { dot: "bg-error", label: "Error" },
@@ -82,7 +83,8 @@ export function VerifyPanel() {
   const { run, isRunning, progress, error, runTests } = useSimulationStore();
   const { drawerOpen, toggleDrawer, drawerHeight } = useUIStore();
   const issues = useIssues();
-  const [tab, setTab] = useState<Tab>("issues");
+  const tab = useUIStore((s) => s.verifyTab);
+  const setTab = useUIStore((s) => s.setVerifyTab);
   const [showInfo, setShowInfo] = useState(false);
 
   const counts = useMemo(
@@ -140,6 +142,7 @@ export function VerifyPanel() {
                     ["issues", `Issues (${counts.error + counts.warning})`],
                     ["tests", run ? `Postgres tests (${passed}/${run.tests.length})` : "Postgres tests"],
                     ["data", "Sample data"],
+                    ["query", "Query"],
                   ] as Array<[Tab, string]>).map(([key, label]) => (
                     <button
                       key={key}
@@ -158,13 +161,15 @@ export function VerifyPanel() {
                       Fix all {fixable.length}
                     </button>
                   )}
-                  <button
-                    onClick={() => void runTests()}
-                    disabled={isRunning}
-                    className="h-8 px-3 rounded-md border border-border text-[12px] font-medium text-foreground hover:bg-foreground/[0.04] disabled:opacity-50"
-                  >
-                    {isRunning ? "Running…" : run ? "Re-run tests" : "Run Postgres tests"}
-                  </button>
+                  {tab !== "query" && (
+                    <button
+                      onClick={() => void runTests()}
+                      disabled={isRunning}
+                      className="h-8 px-3 rounded-md border border-border text-[12px] font-medium text-foreground hover:bg-foreground/[0.04] disabled:opacity-50"
+                    >
+                      {isRunning ? "Running…" : run ? "Re-run tests" : "Run Postgres tests"}
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -215,30 +220,15 @@ export function VerifyPanel() {
                       {run.seed.map((table) => (
                         <div key={table.table}>
                           <h4 className="font-mono text-[12px] font-semibold text-foreground mb-1">{table.table}</h4>
-                          <div className="overflow-x-auto rounded-md border border-border">
-                            <table className="text-[11px] font-mono w-full">
-                              <thead className="bg-node-header">
-                                <tr>{table.columns.map((c) => <th key={c} className="px-2 py-1 text-left font-semibold whitespace-nowrap">{c}</th>)}</tr>
-                              </thead>
-                              <tbody>
-                                {table.rows.length === 0 ? (
-                                  <tr><td className="px-2 py-1 text-muted" colSpan={table.columns.length}>No rows</td></tr>
-                                ) : (
-                                  table.rows.map((row, i) => (
-                                    <tr key={i} className="border-t border-border/60">
-                                      {row.map((cell, j) => <td key={j} className="px-2 py-1 whitespace-nowrap max-w-[220px] truncate">{cell}</td>)}
-                                    </tr>
-                                  ))
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
+                          <ResultTable columns={table.columns} rows={table.rows} maxHeight={220} />
                         </div>
                       ))}
                     </div>
                   ) : (
                     <p className="px-4 py-6 text-[13px] text-muted text-center">Run the Postgres tests to see sample rows.</p>
                   ))}
+
+                {tab === "query" && <QueryTab />}
               </div>
             </div>
           </motion.div>

@@ -16,6 +16,9 @@ import { ImportModal } from "@/components/import/ImportModal";
 import { ShortcutsDialog } from "@/components/shared/ShortcutsDialog";
 import { CommandPalette } from "@/components/shared/CommandPalette";
 import { Tour } from "@/components/shared/Tour";
+import { ObjectEditorDialog } from "@/components/shared/ObjectEditorDialog";
+import { ExplainDialog } from "@/components/shared/ExplainDialog";
+import { MigrationDialog } from "@/components/projects/MigrationDialog";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useUIStore, hydrateUIPreferences } from "@/store/useUIStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
@@ -151,7 +154,7 @@ export default function Home() {
         <OntologySidebar />
 
         {/* Center Canvas */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative @container min-w-0">
           <ERDCanvas />
           <BuildAnimation />
           <CanvasControls />
@@ -173,6 +176,9 @@ export default function Home() {
       <ShortcutsDialog />
       <CommandPalette />
       <Tour />
+      <ObjectEditorDialog />
+      <ExplainDialog />
+      <MigrationDialog />
 
       {/* Error Modal */}
       <AnimatePresence>

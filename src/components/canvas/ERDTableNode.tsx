@@ -70,6 +70,7 @@ function ERDTableNodeComponent({ id, data, selected, draggable }: NodeProps) {
   const hiddenCount = nodeData.columns.length - visibleColumns.length;
   const accent = nodeData.color ? TABLE_COLORS[nodeData.color] : null;
   const unique = new Set(nodeData.uniqueColumns ?? []);
+  const enumNames = new Set(nodeData.enumNames ?? []);
   const footerConstraints = nodeData.constraints.filter(
     (c) => c.type === "CHECK" || (c.type === "UNIQUE" && c.columns.length > 1)
   );
@@ -125,7 +126,7 @@ function ERDTableNodeComponent({ id, data, selected, draggable }: NodeProps) {
               e.stopPropagation();
               setEditing({ kind: "table" });
             }}
-            title={editable ? "Double-click to rename" : undefined}
+            title={[nodeData.comment, editable ? "Double-click to rename" : null].filter(Boolean).join("\n") || undefined}
           >
             {nodeData.tableName}
           </span>
@@ -138,7 +139,11 @@ function ERDTableNodeComponent({ id, data, selected, draggable }: NodeProps) {
           <div className="px-3.5 py-1.5 text-[11px] text-muted italic">No columns</div>
         )}
         {visibleColumns.map((col) => (
-          <div key={col.name} className="relative flex items-center gap-2 px-3.5 py-[5px] hover:bg-node-header/50">
+          <div
+            key={col.name}
+            className="relative flex items-center gap-2 px-3.5 py-[5px] hover:bg-node-header/50"
+            title={[col.comment, col.generated ? `Generated: ${col.generated}` : null].filter(Boolean).join("\n") || undefined}
+          >
             <Handle type="source" position={Position.Left} id={columnHandleId(col.name, "L")} className={handleClass} />
             <span className="w-4 h-4 flex items-center justify-center shrink-0">
               {col.isPrimaryKey ? <KeyIcon /> : col.isForeignKey ? <LinkIcon /> : null}
@@ -165,7 +170,10 @@ function ERDTableNodeComponent({ id, data, selected, draggable }: NodeProps) {
             {unique.has(col.name) && !col.isPrimaryKey && (
               <span className="text-[9px] font-mono font-semibold text-teal" title="Unique">UQ</span>
             )}
-            <span className="text-[11px] font-mono text-muted">{col.dataType}</span>
+            {col.generated && (
+              <span className="text-[9px] font-mono font-semibold text-muted" aria-label="Generated column">GEN</span>
+            )}
+            <span className={`text-[11px] font-mono ${enumNames.has(col.dataType.toLowerCase()) ? "text-teal" : "text-muted"}`}>{col.dataType}</span>
             <span className="w-2 text-[10px] text-error font-semibold" title={col.nullable ? "Nullable" : "NOT NULL"}>
               {col.nullable ? "" : "*"}
             </span>

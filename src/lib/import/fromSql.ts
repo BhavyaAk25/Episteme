@@ -5,6 +5,7 @@
  */
 import type { Column, ERD, OnDeleteAction, Table, TableConstraint, TableIndex } from "@/types/erd";
 import { createPostgres, toPgError } from "@/lib/verify/pg";
+import { cleanViewSql } from "@/lib/erd/model";
 
 export interface ImportResult {
   erd: ERD;
@@ -49,6 +50,8 @@ function balanced(text: string): boolean {
 export function adaptDialect(sql: string): string {
   return sql
     .replace(/`/g, '"')
+    // MySQL inline ENUM('a','b') becomes TEXT with a CHECK on the same values.
+    .replace(/"?(\w+)"?\s+ENUM\s*\(([^)]*)\)/gi, (_, column: string, values: string) => `"${column}" TEXT CHECK ("${column}" IN (${values}))`)
     .replace(/\bINT\s*\(\d+\)/gi, "INTEGER")
     .replace(/\b(INTEGER|INT|BIGINT)\b([^,\n]*?)\bAUTO_INCREMENT\b/gi, (_, type: string, rest: string) => `${/BIG/i.test(type) ? "BIGSERIAL" : "SERIAL"}${rest}`)
     .replace(/\)\s*ENGINE\s*=\s*\w+[^;]*;/gi, ");")
@@ -95,17 +98,43 @@ export async function importSql(rawSql: string): Promise<ImportResult> {
 
 async function introspect(pg: Awaited<ReturnType<typeof createPostgres>>, skipped: string[]): Promise<ImportResult> {
   const tables = (
-    await pg.query<{ oid: number; name: string }>(
-      `SELECT c.oid, c.relname AS name FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    await pg.query<{ oid: number; name: string; comment: string | null }>(
+      `SELECT c.oid, c.relname AS name, obj_description(c.oid, 'pg_class') AS comment FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
        WHERE n.nspname = 'public' AND c.relkind IN ('r','p') ORDER BY c.oid`
     )
   ).rows;
   if (tables.length === 0) throw new Error("No tables were found. Paste CREATE TABLE statements (for example from pg_dump --schema-only).");
 
+  const enums = (
+    await pg.query<{ name: string; values: string[] }>(
+      `SELECT t.typname AS name, array_agg(e.enumlabel ORDER BY e.enumsortorder) AS values
+       FROM pg_type t JOIN pg_enum e ON e.enumtypid = t.oid JOIN pg_namespace n ON n.oid = t.typnamespace
+       WHERE n.nspname = 'public' GROUP BY t.typname ORDER BY t.typname`
+    )
+  ).rows;
+  const enumNames = new Set(enums.map((e) => e.name));
+
+  const views = (
+    await pg.query<{ name: string; sql: string }>(
+      `SELECT c.relname AS name, pg_get_viewdef(c.oid, true) AS sql FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE n.nspname = 'public' AND c.relkind = 'v' ORDER BY c.oid`
+    )
+  ).rows;
+
   const columns = (
-    await pg.query<{ table_oid: number; attnum: number; name: string; type: string; not_null: boolean; default_value: string | null }>(
+    await pg.query<{
+      table_oid: number;
+      attnum: number;
+      name: string;
+      type: string;
+      not_null: boolean;
+      default_value: string | null;
+      generated: string;
+      comment: string | null;
+    }>(
       `SELECT a.attrelid AS table_oid, a.attnum, a.attname AS name, format_type(a.atttypid, a.atttypmod) AS type,
-              a.attnotnull AS not_null, pg_get_expr(d.adbin, d.adrelid) AS default_value
+              a.attnotnull AS not_null, pg_get_expr(d.adbin, d.adrelid) AS default_value,
+              a.attgenerated AS generated, col_description(a.attrelid, a.attnum) AS comment
        FROM pg_attribute a LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
        WHERE a.attrelid = ANY($1) AND a.attnum > 0 AND NOT a.attisdropped ORDER BY a.attrelid, a.attnum`,
       [tables.map((t) => t.oid)]
@@ -140,11 +169,15 @@ async function introspect(pg: Awaited<ReturnType<typeof createPostgres>>, skippe
       .filter((c) => c.table_oid === t.oid)
       .map((c) => {
         const serial = /^nextval\(/.test(c.default_value ?? "") && /int/.test(c.type);
+        // For generated columns pg_attrdef holds the generation expression.
+        const generated = c.generated === "s" && c.default_value ? tidyExpression(c.default_value) : null;
         return {
           name: c.name,
-          dataType: friendlyType(c.type, serial),
+          dataType: enumNames.has(c.type) ? c.type : friendlyType(c.type, serial),
           nullable: !c.not_null,
-          defaultValue: serial || !c.default_value ? null : tidyExpression(c.default_value),
+          defaultValue: serial || generated || !c.default_value ? null : tidyExpression(c.default_value),
+          generated,
+          comment: c.comment,
           isPrimaryKey: pkCols.has(c.attnum),
           isForeignKey: false,
           referencesTable: null,
@@ -171,7 +204,15 @@ async function introspect(pg: Awaited<ReturnType<typeof createPostgres>>, skippe
       }))
       .filter((i) => i.columns.length > 0);
 
-    return { id: `tbl_${t.name}`, name: t.name, objectTypeId: `obj_${t.name}`, columns: cols, constraints: tableConstraints, indexes: tableIndexes };
+    return {
+      id: `tbl_${t.name}`,
+      name: t.name,
+      objectTypeId: `obj_${t.name}`,
+      columns: cols,
+      constraints: tableConstraints,
+      indexes: tableIndexes,
+      comment: t.comment,
+    };
   });
 
   const relationships: ERD["relationships"] = [];
@@ -198,5 +239,13 @@ async function introspect(pg: Awaited<ReturnType<typeof createPostgres>>, skippe
     });
   }
 
-  return { erd: { tables: erdTables, relationships }, skipped };
+  return {
+    erd: {
+      tables: erdTables,
+      relationships,
+      enums: enums.map((e) => ({ name: e.name, values: e.values })),
+      views: views.map((v) => ({ id: `view_${v.name}`, name: v.name, sql: cleanViewSql(v.sql) })),
+    },
+    skipped,
+  };
 }

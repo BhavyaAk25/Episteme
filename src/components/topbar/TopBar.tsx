@@ -75,7 +75,7 @@ export function TopBar() {
   return (
     <header className="relative z-40 bg-surface/94 backdrop-blur border-b border-border px-4 md:px-6 pt-[calc(env(safe-area-inset-top,0px)+12px)] shadow-[0_6px_18px_rgba(86,61,38,0.08)]">
       <div className="min-h-[72px] py-2 flex items-center">
-        <div className="flex flex-wrap lg:flex-nowrap items-center gap-x-4 gap-y-2 w-full min-w-0">
+        <div className="flex flex-wrap xl:flex-nowrap items-center gap-x-4 gap-y-2 w-full min-w-0">
           <div className="flex items-center gap-2.5 shrink-0">
             <div className="w-10 h-10 flex items-center justify-center">
               <Image src="/brand/episteme-mark.svg" alt="Episteme" width={40} height={40} className="logo-light w-10 h-10 object-contain" priority />
@@ -89,7 +89,7 @@ export function TopBar() {
           <SaveIndicator />
 
           {/* On narrow screens the description gets its own full-width row. */}
-          <div className="order-last basis-full lg:order-none lg:basis-auto lg:flex-1 min-w-0">
+          <div className="order-last basis-full xl:order-none xl:basis-auto xl:flex-1 min-w-0">
             <input
               type="text"
               value={prompt}
@@ -119,7 +119,7 @@ export function TopBar() {
             )}
           </button>
 
-          <div className="flex items-center gap-2 lg:gap-3 shrink-0 ml-auto lg:ml-0">
+          <div className="flex items-center gap-2 lg:gap-3 shrink-0 ml-auto xl:ml-0">
             <button
               onClick={handleRunTests}
               data-tour="run-tests"

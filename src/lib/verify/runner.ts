@@ -6,11 +6,11 @@
 import type { PGlite } from "@electric-sql/pglite";
 import type { Column, ERD, Relationship, Table } from "@/types/erd";
 import { erdToSql } from "@/lib/ontology/transformer";
-import { isColumnUnique } from "@/lib/erd/model";
+import { enumOf, isColumnUnique } from "@/lib/erd/model";
 import { createPostgres, toPgError, SQLSTATE } from "./pg";
 import { checkViolation, isAutoIncrement, validLiteral } from "./values";
 
-export type TestKind = "insert" | "not_null" | "unique" | "foreign_key" | "check" | "on_delete";
+export type TestKind = "insert" | "not_null" | "unique" | "foreign_key" | "check" | "on_delete" | "view";
 
 export interface DbTest {
   id: string;
@@ -75,7 +75,7 @@ function fkFor(erd: ERD, table: Table, column: Column): Relationship | undefined
 
 /** Columns we supply on insert: skip auto-increment and defaulted columns. */
 function insertColumns(table: Table): Column[] {
-  return table.columns.filter((c) => !isAutoIncrement(c) && !(c.defaultValue && !c.isForeignKey));
+  return table.columns.filter((c) => !c.generated && !isAutoIncrement(c) && !(c.defaultValue && !c.isForeignKey));
 }
 
 function missingReference(column: Column): string {
@@ -93,12 +93,20 @@ function insertSql(erd: ERD, table: Table, overrides: Record<string, string>, ro
     if (column.name in overrides) return overrides[column.name];
     const rel = fkFor(erd, table, column);
     if (rel) return `(SELECT ${rel.toColumn} FROM ${rel.toTable} ORDER BY ${rel.toColumn} DESC LIMIT 1)`;
-    return validLiteral(table, column, row);
+    return validLiteral(table, column, row, enumOf(erd, column.dataType)?.values);
   });
   return `INSERT INTO ${table.name} (${columns.map((c) => c.name).join(", ")}) VALUES (${values.join(", ")})${returning ? ` RETURNING ${returning}` : ""}`;
 }
 
-export async function runVerification(erd: ERD, onProgress?: (message: string) => void): Promise<VerifyRun> {
+/**
+ * Run every check. With `keepOpen`, the seeded database is returned (and
+ * not closed) so the query playground can use it; the caller closes it.
+ */
+export async function runVerification(
+  erd: ERD,
+  onProgress?: (message: string) => void,
+  options: { keepOpen?: boolean } = {}
+): Promise<VerifyRun & { db: PGlite | null }> {
   const startedAt = Date.now();
   const tests: DbTest[] = [];
   const ddlProblems: DdlProblem[] = [];
@@ -161,7 +169,7 @@ export async function runVerification(erd: ERD, onProgress?: (message: string) =
             }
             values.push(`(SELECT ${rel.toColumn} FROM ${rel.toTable} ORDER BY ${rel.toColumn} OFFSET ${offset} LIMIT 1)`);
           } else {
-            values.push(validLiteral(table, column, row));
+            values.push(validLiteral(table, column, row, enumOf(erd, column.dataType)?.values));
           }
         }
         if (skipRow) break;
@@ -231,7 +239,7 @@ export async function runVerification(erd: ERD, onProgress?: (message: string) =
           if (column.name in overrides) return overrides[column.name];
           const rel = fkFor(erd, table, column);
           if (rel) return `(SELECT ${rel.toColumn} FROM ${rel.toTable} ORDER BY ${rel.toColumn} DESC LIMIT 1)`;
-          return validLiteral(table, column, row);
+          return validLiteral(table, column, row, enumOf(erd, column.dataType)?.values);
         });
       const insert = (overrides: Record<string, string>, row?: number) =>
         `INSERT INTO ${table.name} (${columns.map((c) => c.name).join(", ")}) VALUES (${freshRow(overrides, row).join(", ")})`;
@@ -270,6 +278,17 @@ export async function runVerification(erd: ERD, onProgress?: (message: string) =
           { table: table.name, kind: "foreign_key", title: `${table.name}.${column.name}: rejects a missing ${fkFor(erd, table, column)?.toTable} reference` },
           insert({ [column.name]: missingReference(column) }, 88),
           SQLSTATE.foreignKey
+        );
+      }
+
+      // ENUM: values outside the type are rejected.
+      for (const column of columns) {
+        const type = enumOf(erd, column.dataType);
+        if (!type) continue;
+        await expectError(
+          { table: table.name, kind: "check", title: `${table.name}.${column.name}: only accepts ${type.name} values` },
+          insert({ [column.name]: "'__not_in_enum__'" }, 98),
+          SQLSTATE.invalidText
         );
       }
 
@@ -354,13 +373,29 @@ export async function runVerification(erd: ERD, onProgress?: (message: string) =
     }
     await pg.exec("ROLLBACK;");
 
+    // Views run against the sample data.
+    const workingViews = new Set<string>();
+    for (const view of erd.views ?? []) {
+      const sql = `SELECT * FROM ${view.name} LIMIT 5`;
+      try {
+        const result = await pg.query(sql);
+        workingViews.add(view.name);
+        addTest({ table: view.name, kind: "view", title: `view ${view.name}: runs`, status: "pass", detail: `${result.rows.length} row(s) from the sample data`, sql });
+      } catch (error) {
+        addTest({ table: view.name, kind: "view", title: `view ${view.name}: runs`, status: "fail", detail: toPgError(error).message, sql });
+      }
+    }
+
     // 4. Sample data preview.
-    for (const table of erd.tables) {
-      if (!existing.has(table.name)) continue;
-      const result = await pg.query<Record<string, unknown>>(`SELECT * FROM ${table.name} LIMIT 5`);
+    const previewSources = [
+      ...erd.tables.filter((t) => existing.has(t.name)).map((t) => t.name),
+      ...[...workingViews],
+    ];
+    for (const source of previewSources) {
+      const result = await pg.query<Record<string, unknown>>(`SELECT * FROM ${source} LIMIT 5`);
       const columns = result.fields.map((f) => f.name);
       seed.push({
-        table: table.name,
+        table: source,
         columns,
         rows: result.rows.map((row) =>
           columns.map((c) => {
@@ -372,9 +407,11 @@ export async function runVerification(erd: ERD, onProgress?: (message: string) =
         ),
       });
     }
-  } finally {
+  } catch (error) {
     await pg.close();
+    throw error;
   }
+  if (!options.keepOpen) await pg.close();
 
-  return { startedAt, durationMs: Date.now() - startedAt, ddlProblems, tests, seed };
+  return { startedAt, durationMs: Date.now() - startedAt, ddlProblems, tests, seed, db: options.keepOpen ? pg : null };
 }

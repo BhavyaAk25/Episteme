@@ -2,6 +2,9 @@ import { create } from "zustand";
 
 type PlaybackSpeed = 0.5 | 1 | 2 | 5;
 export type NodeDetail = "full" | "keys" | "names";
+export type VerifyTab = "issues" | "tests" | "data" | "query";
+/** Which enum type or view the editor dialog is open for (no name/id = new). */
+export type ObjectEditorTarget = { kind: "enum"; name?: string } | { kind: "view"; id?: string };
 
 function readDetail(): NodeDetail {
   try {
@@ -29,6 +32,11 @@ interface UIState {
   paletteOpen: boolean;
   tourOpen: boolean;
   nodeDetail: NodeDetail;
+  verifyTab: VerifyTab;
+  objectEditor: ObjectEditorTarget | null;
+  explainOpen: boolean;
+  /** Version id the migration dialog compares the current schema against. */
+  migrationFrom: string | null;
   drawerHeight: number;
 
   // Animation
@@ -55,6 +63,12 @@ interface UIState {
   setPaletteOpen: (open: boolean) => void;
   setTourOpen: (open: boolean) => void;
   setNodeDetail: (detail: NodeDetail) => void;
+  /** Open the bottom panel on a tab. */
+  showVerifyTab: (tab: VerifyTab) => void;
+  setVerifyTab: (tab: VerifyTab) => void;
+  setObjectEditor: (target: ObjectEditorTarget | null) => void;
+  setExplainOpen: (open: boolean) => void;
+  setMigrationFrom: (versionId: string | null) => void;
   openDrawer: () => void;
   closeDrawer: () => void;
   setDrawerHeight: (height: number) => void;
@@ -77,6 +91,10 @@ const initialState = {
   inspectorOpen: false,
   inspectorWidth: 380,
   drawerOpen: false,
+  verifyTab: "issues" as VerifyTab,
+  objectEditor: null,
+  explainOpen: false,
+  migrationFrom: null,
   notice: null as string | null,
   importOpen: false,
   shortcutsOpen: false,
@@ -116,6 +134,11 @@ export const useUIStore = create<UIState>((set) => ({
     set({ nodeDetail });
   },
   openDrawer: () => set({ drawerOpen: true }),
+  showVerifyTab: (verifyTab) => set({ verifyTab, drawerOpen: true }),
+  setVerifyTab: (verifyTab) => set({ verifyTab }),
+  setObjectEditor: (objectEditor) => set({ objectEditor }),
+  setExplainOpen: (explainOpen) => set({ explainOpen }),
+  setMigrationFrom: (migrationFrom) => set({ migrationFrom }),
   closeDrawer: () => set({ drawerOpen: false }),
   setDrawerHeight: (height) => set({ drawerHeight: height }),
 

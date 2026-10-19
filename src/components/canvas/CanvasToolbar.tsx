@@ -189,6 +189,12 @@ export function CanvasToolbar({ disabled }: { disabled: boolean }) {
           </svg>
           History
         </ToolButton>
+        <ToolButton onClick={() => useUIStore.getState().setExplainOpen(true)} disabled={disabled || !hasTables} title="Explain this schema in plain English">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.25v13M12 6.25C10.8 5.5 9.2 5 7.5 5S4.2 5.5 3 6.25v13C4.2 18.5 5.8 18 7.5 18s3.3.5 4.5 1.25m0-13C13.2 5.5 14.8 5 16.5 5s3.3.5 4.5 1.25v13C19.8 18.5 18.2 18 16.5 18s-3.3.5-4.5 1.25" />
+          </svg>
+          Explain
+        </ToolButton>
       </div>
       {historyOpen && !disabled && <HistoryPanel onClose={() => setHistoryOpen(false)} />}
     </Panel>

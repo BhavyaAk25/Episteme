@@ -250,7 +250,7 @@ export function ERDCanvas() {
         {hasSchema && <CanvasToolbar disabled={replaying} />}
         {!replaying && <SelectionBar />}
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="var(--dots)" />
-        <Controls position="bottom-right" showInteractive={false} className="max-md:!mb-20" />
+        <Controls position="bottom-right" showInteractive={false} className="@max-[1040px]:!mb-20" />
         {nodes.length >= 4 && (
           <MiniMap
             position="bottom-left"
@@ -258,7 +258,7 @@ export function ERDCanvas() {
             zoomable
             nodeStrokeColor={(node) => (node.id === selectedNodeId ? "var(--accent-blue)" : "var(--border)")}
             nodeBorderRadius={4}
-            className="max-md:!hidden"
+            className="@max-[720px]:!hidden @max-[1040px]:!mb-20"
             style={{ width: 140, height: 88 }}
           />
         )}

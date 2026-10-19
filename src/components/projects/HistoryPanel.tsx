@@ -2,6 +2,7 @@
 
 import { useProjectsStore } from "@/store/useProjectsStore";
 import { useErdStore } from "@/store/useErdStore";
+import { useUIStore } from "@/store/useUIStore";
 import { timeAgo } from "./ProjectSwitcher";
 
 /** Saved versions of the open project. Restoring is itself undoable. */
@@ -10,7 +11,7 @@ export function HistoryPanel({ onClose }: { onClose: () => void }) {
   const hasTables = useErdStore((state) => (state.erd?.tables.length ?? 0) > 0);
 
   return (
-    <div className="mt-2 w-[320px] rounded-xl border border-border bg-surface shadow-xl overflow-hidden">
+    <div className="mt-2 w-[360px] rounded-xl border border-border bg-surface shadow-xl overflow-hidden">
       <div className="px-3 py-2.5 border-b border-border flex items-center justify-between">
         <h3 className="text-[13px] font-semibold text-foreground">Version history</h3>
         <div className="flex items-center gap-1">
@@ -41,12 +42,24 @@ export function HistoryPanel({ onClose }: { onClose: () => void }) {
                   {index === 0 ? " · latest" : ""}
                 </span>
               </span>
-              <button
-                onClick={() => void restoreVersion(version.id)}
-                className="shrink-0 h-7 px-2.5 rounded-md border border-border text-[11px] font-medium text-foreground opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-elevated transition-opacity"
-              >
-                Restore
-              </button>
+              <span className="shrink-0 flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                <button
+                  onClick={() => {
+                    useUIStore.getState().setMigrationFrom(version.id);
+                    onClose();
+                  }}
+                  title="SQL that upgrades a database from this version to the current schema"
+                  className="h-7 px-2.5 rounded-md border border-border text-[11px] font-medium text-foreground hover:bg-elevated"
+                >
+                  Migration
+                </button>
+                <button
+                  onClick={() => void restoreVersion(version.id)}
+                  className="h-7 px-2.5 rounded-md border border-border text-[11px] font-medium text-foreground hover:bg-elevated"
+                >
+                  Restore
+                </button>
+              </span>
             </li>
           ))}
         </ul>

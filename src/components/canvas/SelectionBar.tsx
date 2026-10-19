@@ -59,7 +59,7 @@ export function SelectionBar() {
 
   const button = "h-7 px-2 rounded-md text-[12px] text-foreground hover:bg-foreground/[0.06]";
   return (
-    <Panel position="bottom-center" className="!mb-4">
+    <Panel position="bottom-center" className="!mb-4 @max-[1040px]:!mb-20">
       <div role="toolbar" aria-label="Selected tables" className="flex items-center gap-1 rounded-lg border border-border bg-surface/95 backdrop-blur px-2 py-1 shadow-md">
         <span className="px-1 text-[12px] font-medium text-foreground">{selected.length} tables</span>
         <span className="w-px h-5 bg-border mx-1" />

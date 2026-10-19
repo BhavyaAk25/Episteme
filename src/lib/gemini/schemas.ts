@@ -262,7 +262,32 @@ const EditOpSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("drop_foreign_key"), from_table: z.string().min(1), from_column: z.string().min(1) }),
   z.object({ op: z.literal("add_index"), table: z.string().min(1), columns: z.array(z.string()).min(1), unique: optionalFlag }),
   z.object({ op: z.literal("add_check"), table: z.string().min(1), expression: z.string().min(1) }),
+  z.object({ op: z.literal("create_enum"), name: z.string().min(1), values: z.array(z.union([z.string(), z.number()]).transform(String)).min(1) }),
+  z.object({ op: z.literal("set_comment"), table: z.string().min(1), column: optionalText, comment: z.string().nullish().transform((v) => v ?? "") }),
+  z.object({ op: z.literal("create_view"), name: z.string().min(1), sql: z.string().min(1) }),
 ]);
+
+// Assistant answers: plain-English questions to SQL, and schema explanations.
+const textList = z
+  .array(z.union([z.string(), z.null()]).catch(null))
+  .nullish()
+  .transform((items) => (items ?? []).filter((t): t is string => typeof t === "string" && t.trim() !== ""));
+
+export const SqlAnswerSchema = z.object({
+  sql: z.string().nullish().transform((v) => (v ?? "").trim()),
+  explanation: z.string().nullish().transform((v) => v ?? ""),
+});
+
+export const ExplainAnswerSchema = z.object({
+  overview: z.string().nullish().transform((v) => v ?? ""),
+  tables: z
+    .array(z.object({ name: z.string(), purpose: z.string().nullish().transform((v) => v ?? "") }).nullable().catch(null))
+    .nullish()
+    .transform((items) => (items ?? []).filter((t): t is { name: string; purpose: string } => t !== null)),
+  flows: textList,
+  notes: textList,
+});
+export type ExplainAnswer = z.output<typeof ExplainAnswerSchema>;
 
 export const EditResponseSchema = z.object({
   summary: z.string().nullish().transform((v) => v ?? ""),

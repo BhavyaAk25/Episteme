@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useErdStore } from "@/store/useErdStore";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
-import { isColumnUnique } from "@/lib/erd/model";
+import { enumOf, isColumnUnique } from "@/lib/erd/model";
 import { TABLE_COLORS, TABLE_COLOR_NAMES } from "@/lib/erd/colors";
 import type { Table } from "@/types/erd";
 import { CommitInput, FlagToggle, SectionHeader, SmallButton, TypeOptions } from "./fields";
@@ -13,6 +13,8 @@ function ColumnRow({ table, index }: { table: Table; index: number }) {
   const column = table.columns[index];
   const { updateColumn, deleteColumn, moveColumn } = useErdStore.getState();
   const unique = isColumnUnique(table, column.name);
+  const isEnum = useErdStore((state) => Boolean(state.erd && enumOf(state.erd, column.dataType)));
+  const [moreOpen, setMoreOpen] = useState(Boolean(column.comment || column.generated));
 
   return (
     <div className="group rounded-lg border border-transparent hover:border-border/70 hover:bg-elevated/60 px-1.5 py-1.5 transition-colors">
@@ -31,6 +33,16 @@ function ColumnRow({ table, index }: { table: Table; index: number }) {
           onCommit={(dataType) => updateColumn(table.id, column.name, { dataType })}
         />
         <div className="flex items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+          <button
+            type="button"
+            onClick={() => setMoreOpen(!moreOpen)}
+            aria-expanded={moreOpen}
+            aria-label={`More options for ${column.name}`}
+            title="Comment and generated value"
+            className={`w-6 h-6 rounded hover:text-foreground ${moreOpen ? "text-foreground" : "text-muted"}`}
+          >
+            ⋯
+          </button>
           <button
             type="button"
             onClick={() => moveColumn(table.id, column.name, -1)}
@@ -84,6 +96,16 @@ function ColumnRow({ table, index }: { table: Table; index: number }) {
           disabled={column.isPrimaryKey}
           onChange={(next) => updateColumn(table.id, column.name, { unique: next })}
         />
+        {isEnum && (
+          <span className="h-6 px-2 rounded-md bg-teal/10 text-teal text-[10px] font-mono font-semibold inline-flex items-center" title="Uses an enum type">
+            ENUM
+          </span>
+        )}
+        {column.generated && (
+          <span className="h-6 px-2 rounded-md bg-foreground/[0.06] text-muted text-[10px] font-mono font-semibold inline-flex items-center" title={`Generated: ${column.generated}`}>
+            GENERATED
+          </span>
+        )}
         {column.isForeignKey && (
           <span
             className="h-6 px-2 rounded-md bg-accent/10 text-accent text-[10px] font-mono font-semibold inline-flex items-center"
@@ -92,14 +114,35 @@ function ColumnRow({ table, index }: { table: Table; index: number }) {
             → {column.referencesTable}.{column.referencesColumn}
           </span>
         )}
-        <CommitInput
-          value={column.defaultValue ?? ""}
-          placeholder="default"
-          ariaLabel={`Default value of ${column.name}`}
-          className="ml-auto w-[96px] h-6 font-mono text-[10px] text-muted"
-          onCommit={(defaultValue) => updateColumn(table.id, column.name, { defaultValue })}
-        />
+        {!column.generated && (
+          <CommitInput
+            value={column.defaultValue ?? ""}
+            placeholder="default"
+            ariaLabel={`Default value of ${column.name}`}
+            className="ml-auto w-[96px] h-6 font-mono text-[10px] text-muted"
+            onCommit={(defaultValue) => updateColumn(table.id, column.name, { defaultValue })}
+          />
+        )}
       </div>
+
+      {moreOpen && (
+        <div className="mt-1.5 pl-2 space-y-1">
+          <CommitInput
+            value={column.comment ?? ""}
+            placeholder="Comment (what this column means)"
+            ariaLabel={`Comment for ${column.name}`}
+            className="w-full h-6 text-[11px] text-foreground"
+            onCommit={(comment) => updateColumn(table.id, column.name, { comment })}
+          />
+          <CommitInput
+            value={column.generated ?? ""}
+            placeholder="Generated from, e.g. quantity * unit_price"
+            ariaLabel={`Generated expression for ${column.name}`}
+            className="w-full h-6 font-mono text-[10px] text-muted"
+            onCommit={(generated) => updateColumn(table.id, column.name, { generated })}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -175,6 +218,13 @@ export function TableEditor({ table }: { table: Table }) {
         onCommit={(name) => renameTable(table.id, name)}
       />
       {description && <p className="mt-1 text-[12px] text-muted leading-snug">{description}</p>}
+      <CommitInput
+        value={table.comment ?? ""}
+        placeholder="Add a comment (exported as COMMENT ON TABLE)"
+        ariaLabel="Table comment"
+        className="mt-1 w-full -ml-2 h-7 text-[12px] text-foreground"
+        onCommit={(comment) => useErdStore.getState().setTableComment(table.id, comment)}
+      />
       <div className="mt-3 flex items-center gap-1.5" role="radiogroup" aria-label="Table color">
         <span className="text-[11px] text-muted mr-1">Color</span>
         {TABLE_COLOR_NAMES.map((color) => (

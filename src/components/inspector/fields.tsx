@@ -1,5 +1,7 @@
 "use client";
 
+import { useErdStore } from "@/store/useErdStore";
+
 import { useRef, useState } from "react";
 
 /**
@@ -171,8 +173,12 @@ export const COMMON_TYPES = [
 ];
 
 export function TypeOptions() {
+  const enumNames = useErdStore((state) => state.erd?.enums?.map((e) => e.name).join(",") ?? "");
   return (
     <datalist id="erd-column-types">
+      {enumNames.split(",").filter(Boolean).map((name) => (
+        <option key={`enum-${name}`} value={name} label={`enum ${name}`} />
+      ))}
       {COMMON_TYPES.map((type) => (
         <option key={type} value={type} />
       ))}

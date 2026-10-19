@@ -25,7 +25,7 @@ import { chatJson, chatJsonStream, type OpenAICompatibleConfig } from "./openaiC
 export interface AiRequest {
   system?: string;
   user: string;
-  operation: "generate" | "autofix" | "edit";
+  operation: "generate" | "autofix" | "edit" | "assist";
   maxOutputTokens?: number;
   temperature?: number;
   useCache?: boolean;
