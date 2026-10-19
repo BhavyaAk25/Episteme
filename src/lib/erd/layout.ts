@@ -8,6 +8,7 @@ export interface Size {
 }
 
 const elk = new ELK();
+const LARGE_SCHEMA = 40;
 
 /** Approximate rendered width of a table node (monospace 12px ≈ 7.2px/char). */
 export function estimateNodeWidth(table: Table): number {
@@ -38,7 +39,9 @@ export async function layoutErd(
       "elk.spacing.nodeNode": "48",
       "elk.spacing.componentComponent": "90",
       "elk.separateConnectedComponents": "true",
-      "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
+      // Network simplex gives the straightest lines but grows steeply with
+      // size (~7s at 100 tables); SIMPLE stays compact and takes ~0.25s.
+      "elk.layered.nodePlacement.strategy": erd.tables.length > LARGE_SCHEMA ? "SIMPLE" : "NETWORK_SIMPLEX",
       "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
       "elk.edgeRouting": "ORTHOGONAL",
     },

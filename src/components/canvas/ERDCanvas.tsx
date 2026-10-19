@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   ReactFlow,
   Background,
@@ -59,6 +59,8 @@ export function ERDCanvas() {
     useCanvasStore();
   const { openInspector } = useUIStore();
 
+  const nodeSignatures = useRef(new Map<string, string>());
+
   // Rebuild React Flow nodes whenever the ERD (or its layout) changes, keeping
   // what React Flow already knows about each node (measured size, selection).
   useEffect(() => {
@@ -67,16 +69,28 @@ export function ERDCanvas() {
     const previousById = new Map(previous.map((node) => [node.id, node]));
     const added = new Set(previewing ? diff.addedTableIds : []);
     const changed = new Set(previewing ? diff.changedTableIds : []);
+    const signatures = nodeSignatures.current;
+    const nextSignatures = new Map<string, string>();
     setNodes(
-      fresh.map((node) => ({
-        ...node,
-        data: { ...node.data, diff: added.has(node.id) ? "added" : changed.has(node.id) ? "changed" : undefined },
-        measured: previousById.get(node.id)?.measured,
-        // Keep multi-selection across edits; fall back to the inspected table.
-        selected: previousById.get(node.id)?.selected ?? node.id === selectedId,
-        draggable: !replaying,
-      }))
+      fresh.map((node) => {
+        const data = { ...node.data, diff: added.has(node.id) ? ("added" as const) : changed.has(node.id) ? ("changed" as const) : undefined };
+        const prev = previousById.get(node.id);
+        // On big schemas most tables are untouched by an edit: keep their node
+        // object so React Flow (and the memoized node) skip re-rendering them.
+        const signature = `${node.position.x},${node.position.y},${replaying}|${JSON.stringify(data)}`;
+        nextSignatures.set(node.id, signature);
+        if (prev && signatures.get(node.id) === signature) return prev;
+        return {
+          ...node,
+          data,
+          measured: prev?.measured,
+          // Keep multi-selection across edits; fall back to the inspected table.
+          selected: prev?.selected ?? node.id === selectedId,
+          draggable: !replaying,
+        };
+      })
     );
+    nodeSignatures.current = nextSignatures;
   }, [viewErd, ontology, positions, replaying, previewing, diff, setNodes]);
 
   // Edges follow live node positions so each end attaches to the facing side.
@@ -242,7 +256,7 @@ export function ERDCanvas() {
         connectionLineStyle={{ stroke: "var(--accent-blue)", strokeWidth: 2 }}
         fitView
         fitViewOptions={CANVAS_FIT_OPTIONS}
-        minZoom={0.1}
+        minZoom={0.02}
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
       >
