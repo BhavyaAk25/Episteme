@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAiProvider } from "@/lib/ai/provider";
 import { getGeminiErrorInfo, extractJSON } from "@/lib/gemini/client";
-import { EDIT_SYSTEM_PROMPT, editUserContent } from "@/lib/gemini/prompts";
+import { EDIT_SYSTEM_PROMPT, FIX_RULES, editUserContent, fixUserContent } from "@/lib/gemini/prompts";
 import { EditResponseSchema } from "@/lib/gemini/schemas";
 import { checkRateLimit, clientKey } from "@/lib/server/rateLimit";
 
@@ -10,13 +10,16 @@ export const maxDuration = 60;
 
 const EDIT_RATE_LIMIT = 15;
 const EDIT_RATE_WINDOW_MS = 60_000;
-const MAX_INSTRUCTION_LENGTH = 1000;
+const MAX_INSTRUCTION_LENGTH = 2500;
 const MAX_SCHEMA_TEXT_LENGTH = 60_000;
 
 const RequestSchema = z.object({
   instruction: z.string().trim().min(1).max(MAX_INSTRUCTION_LENGTH),
   // The client sends a compact text description of the current schema.
   schemaText: z.string().max(MAX_SCHEMA_TEXT_LENGTH),
+  // "fix": repair one reported problem with the smallest safe change.
+  mode: z.enum(["edit", "fix"]).optional(),
+  previousAttempt: z.string().max(4000).optional(),
 });
 
 /** POST { instruction, schemaText } → { summary, operations } */
@@ -55,8 +58,11 @@ export async function POST(request: Request) {
   let raw: string;
   try {
     raw = await provider.generateJson({
-      system: EDIT_SYSTEM_PROMPT,
-      user: editUserContent(parsed.data.schemaText, parsed.data.instruction),
+      system: parsed.data.mode === "fix" ? `${EDIT_SYSTEM_PROMPT}\n${FIX_RULES}` : EDIT_SYSTEM_PROMPT,
+      user:
+        parsed.data.mode === "fix"
+          ? fixUserContent(parsed.data.schemaText, parsed.data.instruction, parsed.data.previousAttempt)
+          : editUserContent(parsed.data.schemaText, parsed.data.instruction),
       operation: "edit",
       maxOutputTokens: 8192,
       temperature: 0.3,

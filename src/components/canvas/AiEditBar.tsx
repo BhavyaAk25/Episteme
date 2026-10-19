@@ -5,6 +5,7 @@ import { useAiEditStore } from "@/store/useAiEditStore";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useReplayView } from "@/lib/erd/useReplayView";
 import { useProjectsStore } from "@/store/useProjectsStore";
+import { useErdStore } from "@/store/useErdStore";
 
 const EXAMPLES = ["add product reviews with a 1–5 rating", "track who created each order", "let products belong to many categories"];
 
@@ -19,7 +20,8 @@ const Sparkle = ({ className = "w-4 h-4" }: { className?: string }) => (
  * canvas, then apply (one undoable step) or discard.
  */
 export function AiEditBar() {
-  const { status, summary, results, error, diff, instruction, request, accept, discard } = useAiEditStore();
+  const { status, summary, results, error, diff, instruction, request, accept, discard, fixing, verdict, previewErd } = useAiEditStore();
+  const currentErd = useErdStore((state) => state.erd);
   const isGenerating = useProjectStore((state) => state.isGenerating);
   const { active: replaying } = useReplayView();
   const [draft, setDraft] = useState("");
@@ -29,6 +31,7 @@ export function AiEditBar() {
 
   if (status === "preview") {
     const applied = results.filter((r) => r.ok).length;
+    const changesNothing = previewErd === currentErd;
     const failed = results.length - applied;
     const visible = showAll ? results : results.slice(0, 6);
     return (
@@ -40,12 +43,28 @@ export function AiEditBar() {
             <p className="mt-0.5 text-[13px] text-foreground leading-snug">{summary || "Proposed changes are shown on the canvas."}</p>
           </div>
         </div>
+        {verdict && (
+          <p
+            role="status"
+            className={`mx-4 mb-2 px-2.5 py-1.5 rounded-md text-[12px] leading-snug ${
+              verdict.resolved ? "bg-success/10 text-success" : "bg-warning/10 text-foreground"
+            }`}
+          >
+            <span className={verdict.resolved ? "" : "text-warning font-semibold"}>{verdict.resolved ? "✓ " : "Not fixed yet: "}</span>
+            {verdict.message}
+          </p>
+        )}
         {results.length > 0 && (
           <ul className="px-4 pb-2 space-y-0.5 max-h-[180px] overflow-y-auto">
             {visible.map((result, index) => (
               <li key={index} className="flex items-start gap-2 text-[12px]">
                 <span className={result.ok ? "text-success" : "text-error"}>{result.ok ? "✓" : "✗"}</span>
-                <span className={`font-mono ${result.ok ? "text-foreground" : "text-muted line-through"}`}>{result.label}</span>
+                <span
+                  className={`font-mono ${!result.ok ? "text-muted line-through" : /^Remove /.test(result.label) ? "text-warning" : "text-foreground"}`}
+                  title={result.ok && /^Remove /.test(result.label) ? "Deletes data in this column or table" : undefined}
+                >
+                  {result.label}
+                </span>
                 {!result.ok && result.error && <span className="text-[11px] text-error">— {result.error}</span>}
               </li>
             ))}
@@ -71,15 +90,22 @@ export function AiEditBar() {
             <button onClick={discard} className="ui-ghost-btn !min-h-8 !py-1 !px-3">
               Discard
             </button>
+            {fixing && verdict && !verdict.resolved && (
+              <button onClick={() => void useAiEditStore.getState().requestFix(fixing)} className="ui-ghost-btn !min-h-8 !py-1 !px-3">
+                Try again
+              </button>
+            )}
             <button
               onClick={async () => {
                 const projects = useProjectsStore.getState();
                 await projects.checkpoint("Your edits before AI change");
                 accept();
-                await projects.addVersion(`AI: ${instruction}`);
+                await projects.addVersion(fixing ? `AI fix: ${fixing.title}` : `AI: ${instruction}`);
               }}
-              disabled={applied === 0} className="ui-primary-btn !min-h-8 !py-1 !px-3 disabled:opacity-40">
-              Apply changes
+              disabled={applied === 0 || changesNothing}
+              className="ui-primary-btn !min-h-8 !py-1 !px-3 disabled:opacity-40"
+            >
+              {fixing ? (verdict?.resolved ? "Apply fix" : "Apply anyway") : "Apply changes"}
             </button>
           </div>
         </div>

@@ -18,6 +18,10 @@ export interface Issue {
   table: string | null;
   fix?: { label: string; ops: EditOp[] };
   askAi?: string;
+  /** Extra facts for an AI fix, e.g. the SQL that failed. */
+  context?: string;
+  /** For failed Postgres tests: the test's title, to check the fix. */
+  testTitle?: string;
 }
 
 const MONEY = /(^|_)(price|amount|cost|total|subtotal|balance|fee|fees|salary|tax|discount_amount|payment|revenue)($|_)/;

@@ -167,6 +167,7 @@ Respond with JSON only, in exactly this shape:
     {"op": "drop_foreign_key", "from_table": "child", "from_column": "parent_id"},
     {"op": "add_index", "table": "name", "columns": ["a", "b"], "unique": false},
     {"op": "add_check", "table": "name", "expression": "price >= 0"},
+    {"op": "drop_check", "table": "name", "expression": "the exact expression shown in the schema"},
     {"op": "create_enum", "name": "order_status", "values": ["pending", "paid"]},
     {"op": "set_comment", "table": "name", "column": "optional column", "comment": "what it means"},
     {"op": "create_view", "name": "name", "sql": "SELECT ..."}
@@ -174,6 +175,20 @@ Respond with JSON only, in exactly this shape:
 }
 To use an enum type, create it first, then set a column's type to its name.
 If the request can't be done or is unclear, return an empty "operations" array and explain why in "summary".`;
+
+/** Extra rules when the request is to fix one reported problem. */
+export const FIX_RULES = `
+You are fixing ONE specific problem that Episteme found, described in <problem>. Additional rules:
+- Make the smallest change that removes the problem. Leave everything else exactly as it is.
+- Never drop a table. Only drop a column when the problem is about that column (for example moving repeated columns into a child table, after creating the child table).
+- To loosen or correct a wrong CHECK, drop_check the existing expression (copy it exactly from the schema), then add_check the corrected one if one is still needed.
+- To fix a failing database test, read the failing SQL and error: change the rule that rejects valid data, or add the rule that is missing.
+- If <previous_attempt> is present, your earlier operations did not fix the problem; read why and try a different approach.`;
+
+export const fixUserContent = (schemaText: string, problem: string, previousAttempt?: string) =>
+  `${delimitUntrusted("schema", schemaText)}\n\n${delimitUntrusted("problem", problem)}${
+    previousAttempt ? `\n\n${delimitUntrusted("previous_attempt", previousAttempt)}` : ""
+  }\n\n${delimitUntrusted("request", "Fix the problem described above.")}`;
 
 export const SQL_SYSTEM_PROMPT = `You are Episteme, an expert PostgreSQL developer. You write one SQL query that answers the user's question about their database.
 
