@@ -14,6 +14,10 @@ export interface Column {
   isForeignKey: boolean;
   referencesTable: string | null;
   referencesColumn: string | null;
+  /** Free-text description, exported as COMMENT ON COLUMN. */
+  comment?: string | null;
+  /** Expression for a stored generated column (GENERATED ALWAYS AS (...) STORED). */
+  generated?: string | null;
 }
 
 export interface TableConstraint {
@@ -40,6 +44,21 @@ export interface Table {
   indexes: TableIndex[];
   /** Optional color tag for visual grouping (diagram only). */
   color?: TableColor;
+  /** Free-text description, exported as COMMENT ON TABLE. */
+  comment?: string | null;
+}
+
+/** A Postgres ENUM type; a column uses it by setting dataType to its name. */
+export interface EnumType {
+  name: string;
+  values: string[];
+}
+
+/** A SQL view: CREATE VIEW name AS <sql>. */
+export interface View {
+  id: string;
+  name: string;
+  sql: string;
 }
 
 export interface Relationship {
@@ -56,6 +75,8 @@ export interface Relationship {
 export interface ERD {
   tables: Table[];
   relationships: Relationship[];
+  enums?: EnumType[];
+  views?: View[];
 }
 
 // React Flow node/edge data types
@@ -72,6 +93,9 @@ export interface ERDNodeData extends Record<string, unknown> {
   /** Set while previewing an AI edit. */
   diff?: "added" | "changed";
   color?: TableColor;
+  comment?: string | null;
+  /** Enum type names in this schema, so nodes can mark enum columns. */
+  enumNames?: string[];
 }
 
 export interface ERDEdgeData extends Record<string, unknown> {

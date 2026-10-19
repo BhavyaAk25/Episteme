@@ -21,6 +21,11 @@ import {
   deleteRelationship as deleteRelationshipOp,
   setTableColor as setTableColorOp,
   pasteTables as pasteTablesOp,
+  setTableComment as setTableCommentOp,
+  upsertEnum as upsertEnumOp,
+  deleteEnum as deleteEnumOp,
+  upsertView as upsertViewOp,
+  deleteView as deleteViewOp,
   type TableClipboard,
   type ColumnPatch,
   type EditResult,
@@ -66,6 +71,12 @@ interface ErdState {
   deleteTables: (tableIds: string[]) => void;
   setTableColor: (tableIds: string[], color: TableColor | null) => void;
   pasteTables: (clip: TableClipboard, offset: XY) => string[];
+  setTableComment: (tableId: string, comment: string | null) => void;
+  /** Create or update an enum type; returns false (and sets lastError) on failure. */
+  upsertEnum: (name: string, values: string[], previousName?: string) => boolean;
+  deleteEnum: (name: string) => void;
+  upsertView: (view: { id?: string; name: string; sql: string }) => boolean;
+  deleteView: (viewId: string) => void;
 }
 
 export const useErdStore = create<ErdState>()(
@@ -147,6 +158,11 @@ export const useErdStore = create<ErdState>()(
             set({ erd, positions, lastError: null });
           },
           setTableColor: (tableIds, color) => void commit(setTableColorOp(current(), tableIds, color)),
+          setTableComment: (tableId, comment) => void commit(setTableCommentOp(current(), tableId, comment)),
+          upsertEnum: (name, values, previousName) => Boolean(commit(upsertEnumOp(current(), name, values, previousName))),
+          deleteEnum: (name) => void commit(deleteEnumOp(current(), name)),
+          upsertView: (view) => Boolean(commit(upsertViewOp(current(), view))),
+          deleteView: (viewId) => void commit(deleteViewOp(current(), viewId)),
           pasteTables: (clip, offset) => {
             const result = pasteTablesOp(current(), clip);
             if (!result.ok) {

@@ -173,6 +173,7 @@ export function erdToNodes(
   positions: Record<string, { x: number; y: number }> = {}
 ): Node<ERDNodeData>[] {
   const fallback = layeredPositions(erd);
+  const enumNames = (erd.enums ?? []).map((e) => e.name);
 
   return erd.tables.map((table, index) => {
     const objectType = ontology?.objectTypes.find(
@@ -198,6 +199,8 @@ export function erdToNodes(
         objectTypeId: table.objectTypeId,
         uniqueColumns: uniqueColumnsOf(table),
         color: table.color,
+        comment: table.comment ?? null,
+        enumNames,
       },
     };
   });
@@ -268,17 +271,25 @@ export function erdToEdges(
   });
 }
 
+const sqlString = (text: string) => `'${text.replace(/\s+/g, " ").trim().replace(/'/g, "''")}'`;
+
 /**
- * Generate SQL CREATE TABLE statements from ERD
+ * Generate PostgreSQL DDL from the ERD: enum types, tables, foreign keys,
+ * indexes, comments and views. Statements are separated by blank lines.
  */
 export function erdToSql(erd: ERD): string {
   const statements: string[] = [];
 
+  for (const type of erd.enums ?? []) {
+    statements.push(`CREATE TYPE ${type.name} AS ENUM (${type.values.map(sqlString).join(", ")});`);
+  }
+
   for (const table of erd.tables) {
     const columns = table.columns.map((col) => {
       let def = `  ${col.name} ${col.dataType}`;
+      if (col.generated) def += ` GENERATED ALWAYS AS (${col.generated}) STORED`;
       if (!col.nullable) def += " NOT NULL";
-      if (col.defaultValue) def += ` DEFAULT ${col.defaultValue}`;
+      if (col.defaultValue && !col.generated) def += ` DEFAULT ${col.defaultValue}`;
       return def;
     });
 
@@ -327,6 +338,19 @@ export function erdToSql(erd: ERD): string {
         `CREATE ${unique}INDEX ${index.name} ON ${table.name} (${index.columns.join(", ")});`
       );
     }
+  }
+
+  // Comments
+  for (const table of erd.tables) {
+    if (table.comment) statements.push(`COMMENT ON TABLE ${table.name} IS ${sqlString(table.comment)};`);
+    for (const col of table.columns) {
+      if (col.comment) statements.push(`COMMENT ON COLUMN ${table.name}.${col.name} IS ${sqlString(col.comment)};`);
+    }
+  }
+
+  // Views last: they read from the tables above.
+  for (const view of erd.views ?? []) {
+    statements.push(`CREATE VIEW ${view.name} AS\n${view.sql};`);
   }
 
   return statements.join("\n\n");

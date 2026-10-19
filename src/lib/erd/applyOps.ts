@@ -14,8 +14,11 @@ import {
   deleteRelationship,
   deleteTable,
   renameTable,
+  setTableComment,
   updateColumn,
   updateRelationship,
+  upsertEnum,
+  upsertView,
   type EditResult,
   type NewColumnSpec,
 } from "./model";
@@ -58,7 +61,10 @@ export type EditOp =
     }
   | { op: "drop_foreign_key"; from_table: string; from_column: string }
   | { op: "add_index"; table: string; columns: string[]; unique?: boolean }
-  | { op: "add_check"; table: string; expression: string };
+  | { op: "add_check"; table: string; expression: string }
+  | { op: "create_enum"; name: string; values: string[] }
+  | { op: "set_comment"; table: string; column?: string; comment: string }
+  | { op: "create_view"; name: string; sql: string };
 
 export interface OpResult {
   label: string;
@@ -99,6 +105,12 @@ function describe(op: EditOp): string {
       return `Index ${op.table} (${op.columns.join(", ")})${op.unique ? " UNIQUE" : ""}`;
     case "add_check":
       return `Check on ${op.table}: ${op.expression}`;
+    case "create_enum":
+      return `Enum type ${op.name} (${op.values.join(", ")})`;
+    case "set_comment":
+      return `Comment on ${op.table}${op.column ? `.${op.column}` : ""}`;
+    case "create_view":
+      return `View ${op.name}`;
   }
 }
 
@@ -200,6 +212,15 @@ function applyOne(erd: ERD, op: EditOp): EditResult {
       const id = tableId(erd, op.table);
       return id ? addCheckConstraint(erd, id, op.expression) : missingTable(op.table);
     }
+    case "create_enum":
+      return upsertEnum(erd, op.name, op.values, erd.enums?.some((e) => e.name === op.name) ? op.name : undefined);
+    case "set_comment": {
+      const id = tableId(erd, op.table);
+      if (!id) return missingTable(op.table);
+      return op.column ? updateColumn(erd, id, op.column, { comment: op.comment }) : setTableComment(erd, id, op.comment);
+    }
+    case "create_view":
+      return upsertView(erd, { id: erd.views?.find((v) => v.name === op.name)?.id, name: op.name, sql: op.sql });
   }
 }
 
@@ -241,6 +262,8 @@ export function describeErdForAi(erd: ERD): string {
             unique.has(c.name) && "UNIQUE",
             c.defaultValue && `DEFAULT ${c.defaultValue}`,
             c.isForeignKey && `FK->${c.referencesTable}.${c.referencesColumn}`,
+            c.generated && `GENERATED AS (${c.generated})`,
+            c.comment && `-- ${c.comment.replace(/\s+/g, " ")}`,
           ]
             .filter(Boolean)
             .join(" ")
@@ -251,7 +274,10 @@ export function describeErdForAi(erd: ERD): string {
         ...table.constraints.filter((c) => c.type === "CHECK" && c.expression).map((c) => `check(${c.expression})`),
         ...table.indexes.map((i) => `${i.unique ? "unique " : ""}index(${i.columns.join(", ")})`),
       ];
-      return `table ${table.name}: ${columns}${extras.length ? `\n  ${extras.join("; ")}` : ""}`;
+      const comment = table.comment ? ` -- ${table.comment.replace(/\s+/g, " ")}` : "";
+      return `table ${table.name}${comment}: ${columns}${extras.length ? `\n  ${extras.join("; ")}` : ""}`;
     })
+    .concat((erd.enums ?? []).map((e) => `enum ${e.name}: ${e.values.join(", ")}`))
+    .concat((erd.views ?? []).map((v) => `view ${v.name}: ${v.sql.replace(/\s+/g, " ")}`))
     .join("\n");
 }

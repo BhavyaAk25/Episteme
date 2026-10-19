@@ -20,6 +20,8 @@ Describe your system, for example _"event ticketing with venues, events, ticket 
 - **A real ERD editor**: add, rename and delete tables and columns. Set types, primary key, NOT NULL, UNIQUE and defaults, and reorder columns. Add CHECK constraints and indexes.
 - **Draw foreign keys**: drag from a column to another table's key. A correctly typed `<table>_id` column is created when needed. Set 1:1 or 1:N, required, and ON DELETE in plain language.
 - **Crow's-foot notation**: lines connect column to column and show optionality and cardinality. **Tidy up** re-lays out the diagram (ELK).
+- **Postgres features**: enum types, column and table comments, generated (computed) columns and views, all exported and tested.
+- **Work fast**: ⌘K command palette, multi-select with align/distribute/color, copy/paste and duplicate (relationships come along), column detail levels (all / keys / names) for big diagrams.
 - **Undo/redo everything** (⌘Z / ⌘⇧Z). Names are validated (snake_case, no reserved words), and renames update every reference.
 - **Ask AI to change…**: "add product reviews with a 1–5 rating". The AI proposes small edit operations, applied with the same validation as manual edits. You preview them on the canvas (new tables green, changed tables amber), then apply or discard.
 
@@ -39,9 +41,12 @@ Describe your system, for example _"event ticketing with venues, events, ticket 
 
   Issues without a safe automatic fix get **Ask AI to fix**.
 - **Prompt coverage**: flags things you mentioned that no table stores.
+- **Query playground**: run SQL against the sample rows in the same in-browser Postgres, start from example joins, or ask in English and get SQL to review.
+- **Explain this schema**: a plain-English tour of every table and how they connect, offline or written by the AI.
 
 ### Keep and share
 - **Projects and version history**: several projects, autosaved. Versions are recorded on every generation, AI change and restore, and on demand. Restoring can be undone.
+- **Migrations**: pick two versions and get the `ALTER` SQL between them (renames detected, data-loss steps flagged), then **verify it in Postgres**: Episteme applies it to the old schema and checks the result matches the new one exactly.
 - **Export**:
   - PostgreSQL, MySQL 8, SQLite, Prisma, Drizzle ORM, ontology JSON and an HTML checks report, as a .zip
   - the diagram as PNG or SVG
@@ -59,6 +64,7 @@ Browser (Next.js · React Flow · Zustand)
 ├─ IndexedDB: projects and version history
 └─ calls ──► /api/generate  (streams NDJSON progress, then the schema)
              /api/edit      (returns edit operations for "Ask AI to change")
+             /api/assist    (English → SQL, and "Explain this schema")
                   │
                   └─ AI provider: Gemini (default) or Groq / OpenRouter / Ollama
 ```

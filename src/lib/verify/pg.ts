@@ -31,4 +31,5 @@ export const SQLSTATE = {
   foreignKey: "23503",
   unique: "23505",
   check: "23514",
+  invalidText: "22P02",
 } as const;

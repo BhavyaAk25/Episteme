@@ -17,6 +17,8 @@ Episteme is a Next.js app where almost everything runs in the browser. The serve
 
 - **`src/lib/erd/model.ts`**: pure, validated edit operations (add/rename/delete tables and columns, foreign keys, constraints, indexes). `normalizeErd` keeps the invariants: relationships own foreign keys, "required" mirrors NOT NULL, and nothing references a missing table or column.
 - **`src/lib/erd/applyOps.ts`**: applies a list of edit operations (from the AI, the linter's fixes, or tests) through the model functions, reporting each result.
+- **`src/lib/erd/migrate.ts`**: diffs two ERDs into PostgreSQL ALTER statements (tables matched by id so renames survive) and verifies a migration by applying it in PGlite and comparing the result with the target schema.
+- **`src/lib/erd/describe.ts`**: offline example queries and a structural plain-English description of the schema.
 - **`src/store/useErdStore.ts`**: the single source of truth, with undo history (zundo) and localStorage persistence of the working copy.
 - **`src/store/useProjectsStore.ts`** + **`src/lib/storage/idb.ts`**: projects and version history in IndexedDB.
 
@@ -24,6 +26,7 @@ Episteme is a Next.js app where almost everything runs in the browser. The serve
 
 - **`/api/generate`**: one call produces plan, ontology and ERD as JSON. With `stream: true` the route streams NDJSON `progress` events (phase plus table names parsed from the partial JSON), then a `result` or `error`. Output is validated with forgiving Zod schemas (`src/lib/gemini/schemas.ts`) and normalised (`src/lib/generation/server.ts`). If the AI fails, the route returns an honest error, or the built-in template the user picked; never a guessed schema.
 - **`/api/edit`**: given a compact text form of the schema and a request, returns edit operations for the preview/apply flow.
+- **`/api/assist`**: turns a plain-English question into one SELECT for the query playground, or explains the schema. Answers are only displayed; SQL runs only when the user clicks Run, in the in-browser sample database.
 - **`src/lib/ai/provider.ts`**: Gemini by default (`@google/genai`, `thinkingLevel: low`), or any OpenAI-compatible free backend (Groq, OpenRouter, Ollama) via `AI_PROVIDER`.
 - Both routes are rate-limited per client (`src/lib/server/rateLimit.ts`) and size-limited. User text is delimited and kept out of the system instructions.
 
@@ -32,6 +35,7 @@ Episteme is a Next.js app where almost everything runs in the browser. The serve
 - **`runner.ts`**: starts a fresh PGlite instance, runs `erdToSql` statement by statement, and seeds realistic rows parents-first (`values.ts`). It then tests NOT NULL, UNIQUE, FK and CHECK by expected SQLSTATE, each inside a savepoint. ON DELETE behaviour is tested with a fresh parent and child per relationship.
 - **`linter.ts`**: design rules with explanations and fixes expressed as edit operations.
 - **`coverage.ts`**: entities named in the prompt that no table or column matches.
+- The seeded database stays open after a run (`useSimulationStore.db`) so the query playground and view previews use the same sample rows; any schema edit closes it.
 - **`useIssues.ts`**: merges linter, coverage, SQL errors and failed tests; applies fixes or sends issues to "Ask AI to change".
 
 ## Import (`src/lib/import/fromSql.ts`)

@@ -65,10 +65,15 @@ function numberInRange(table: Table, column: Column, preferred: number): number 
   return value;
 }
 
-/** A valid literal for `column` in row number `row` (0-based). */
-export function validLiteral(table: Table, column: Column, row: number): string {
+/**
+ * A valid literal for `column` in row number `row` (0-based). Pass the
+ * values of the column's enum type when it has one.
+ */
+export function validLiteral(table: Table, column: Column, row: number, enumValues?: string[]): string {
   const name = column.name.toLowerCase();
   const type = column.dataType.toUpperCase();
+
+  if (enumValues?.length) return quote(enumValues[row % enumValues.length]);
 
   const allowed = allowedValues(table, column);
   if (allowed) return quote(allowed[row % allowed.length]);

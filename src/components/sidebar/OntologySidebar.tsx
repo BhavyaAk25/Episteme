@@ -9,6 +9,45 @@ import { SidebarLoadingSkeleton } from "@/components/shared/LoadingStates";
 import { TemplateSelector } from "./TemplateSelector";
 import { motion, AnimatePresence } from "framer-motion";
 
+function ObjectList({
+  title,
+  empty,
+  onAdd,
+  items,
+}: {
+  title: string;
+  empty: string;
+  onAdd: () => void;
+  items: Array<{ key: string; name: string; detail: string; onClick: () => void }>;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <h3 className="ui-section-title">{title}</h3>
+        <button onClick={onAdd} className="h-6 px-2 rounded-md text-[11px] font-medium text-accent hover:bg-accent/10">
+          + New
+        </button>
+      </div>
+      {items.length === 0 ? (
+        <p className="mt-2 text-[11px] text-muted">{empty}</p>
+      ) : (
+        <div className="mt-2 space-y-1">
+          {items.map((item) => (
+            <button
+              key={item.key}
+              onClick={item.onClick}
+              className="w-full text-left px-3 py-1.5 rounded-lg bg-elevated/60 border border-transparent hover:bg-elevated hover:border-border/60"
+            >
+              <span className="block font-mono text-[12px] font-semibold text-foreground truncate">{item.name}</span>
+              <span className="block text-[11px] text-muted truncate font-mono">{item.detail}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function OntologySidebar() {
   const { ontology, isGenerating } = useProjectStore();
   const erd = useErdStore((state) => state.erd);
@@ -115,22 +154,32 @@ export function OntologySidebar() {
                       </div>
                     </div>
 
-                    {(ontology?.actionTypes.length ?? 0) > 0 && (
+                    {erd.tables.length > 0 && (
                       <>
                         <div className="mt-6 mb-4 -mx-5 border-t border-border/70" />
-                        <div>
-                          <h3 className="ui-section-title">Actions (from AI plan)</h3>
-                          <div className="mt-3 space-y-1">
-                            {ontology?.actionTypes.map((action) => (
-                              <div key={action.id} className="px-3 py-1.5 rounded-lg flex items-center gap-2.5" title={action.description}>
-                                <svg className="w-3.5 h-3.5 text-warning shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                </svg>
-                                <span className="text-[12px] text-foreground">{action.name}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
+                        <ObjectList
+                          title="Enum types"
+                          empty="Fixed value lists, like an order status."
+                          onAdd={() => useUIStore.getState().setObjectEditor({ kind: "enum" })}
+                          items={(erd.enums ?? []).map((e) => ({
+                            key: e.name,
+                            name: e.name,
+                            detail: e.values.join(", "),
+                            onClick: () => useUIStore.getState().setObjectEditor({ kind: "enum", name: e.name }),
+                          }))}
+                        />
+                        <div className="mt-6 mb-4 -mx-5 border-t border-border/70" />
+                        <ObjectList
+                          title="Views"
+                          empty="Saved queries you can select from like tables."
+                          onAdd={() => useUIStore.getState().setObjectEditor({ kind: "view" })}
+                          items={(erd.views ?? []).map((v) => ({
+                            key: v.id,
+                            name: v.name,
+                            detail: v.sql.replace(/\s+/g, " "),
+                            onClick: () => useUIStore.getState().setObjectEditor({ kind: "view", id: v.id }),
+                          }))}
+                        />
                       </>
                     )}
                   </>

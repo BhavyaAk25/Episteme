@@ -12,6 +12,7 @@
  */
 import type {
   Column,
+  EnumType,
   ERD,
   OnDeleteAction,
   Relationship,
@@ -174,7 +175,93 @@ export function normalizeErd(erd: ERD): ERD {
     ),
   }));
 
-  return { tables: finalTables, relationships: finalRelationships };
+  return { ...erd, tables: finalTables, relationships: finalRelationships };
+}
+
+// Anything that is spliced into SQL unquoted must not be able to end the
+// statement. Names are coerced to plain identifiers; expressions and types
+// with statement separators are dropped.
+const SAFE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const SAFE_TYPE = /^[A-Za-z_][A-Za-z0-9_ ]*(\(\s*\d+\s*(,\s*\d+\s*)?\))?[A-Za-z0-9_ ]*(\[\])?$/;
+/** Error message when a data type isn't a plain SQL type name, else null. */
+export function validateDataType(dataType: string): string | null {
+  return SAFE_TYPE.test(dataType.trim()) ? null : `"${dataType.trim().slice(0, 40)}" isn't a valid type. Use a type like TEXT, INTEGER or NUMERIC(12,2).`;
+}
+
+// Every generated statement starts with Episteme's own prefix, so without a
+// semicolon a fragment can't start a statement of its own.
+const unsafeExpression = (text: string | null | undefined) => typeof text === "string" && text.includes(";");
+
+function safeName(name: unknown, fallback: string): string {
+  const text = typeof name === "string" ? name : "";
+  if (SAFE_NAME.test(text) && text.length <= 63) return text;
+  return (toIdentifier(text) || fallback).slice(0, 63);
+}
+
+/**
+ * Make an ERD from an untrusted source (share link, storage, AI output) safe
+ * to turn into SQL: every identifier is a plain name, data types look like
+ * types, and no default, CHECK, generated expression or view can end the
+ * statement it is placed in.
+ */
+export function sanitizeErd(erd: ERD): ERD {
+  const tableNames = new Map<string, string>();
+  const columnNames = new Map<string, Map<string, string>>();
+  const fixColumn = (table: string, column: string) => columnNames.get(table)?.get(column) ?? column;
+
+  const tables = (erd.tables ?? []).map((table, ti) => {
+    const name = safeName(table.name, `table_${ti + 1}`);
+    tableNames.set(table.name, name);
+    const map = new Map<string, string>();
+    columnNames.set(table.name, map);
+    const columns = (table.columns ?? []).map((column, ci) => {
+      const columnName = safeName(column.name, `column_${ci + 1}`);
+      map.set(column.name, columnName);
+      return {
+        ...column,
+        name: columnName,
+        dataType: typeof column.dataType === "string" && SAFE_TYPE.test(column.dataType.trim()) ? column.dataType.trim() : "TEXT",
+        defaultValue: unsafeExpression(column.defaultValue) ? null : column.defaultValue ?? null,
+        generated: unsafeExpression(column.generated) ? null : column.generated ?? null,
+      };
+    });
+    const rename = (cols: string[]) => (cols ?? []).map((c) => map.get(c) ?? c);
+    return {
+      ...table,
+      name,
+      columns,
+      constraints: (table.constraints ?? [])
+        .filter((c) => !(c.type === "CHECK" && unsafeExpression(c.expression)))
+        .map((c) => ({ ...c, columns: rename(c.columns) })),
+      indexes: (table.indexes ?? []).map((i, ii) => ({ ...i, name: safeName(i.name, `idx_${name}_${ii + 1}`), columns: rename(i.columns) })),
+    };
+  });
+
+  const relationships = (erd.relationships ?? []).map((r) => ({
+    ...r,
+    fromTable: tableNames.get(r.fromTable) ?? safeName(r.fromTable, "missing"),
+    toTable: tableNames.get(r.toTable) ?? safeName(r.toTable, "missing"),
+    fromColumn: fixColumn(r.fromTable, r.fromColumn),
+    toColumn: fixColumn(r.toTable, r.toColumn),
+  }));
+  // Column references inside tables follow the renamed tables too.
+  const fixedTables = tables.map((t) => ({
+    ...t,
+    columns: t.columns.map((c) =>
+      c.referencesTable
+        ? { ...c, referencesTable: tableNames.get(c.referencesTable) ?? c.referencesTable, referencesColumn: c.referencesColumn ? fixColumn(c.referencesTable, c.referencesColumn) : c.referencesColumn }
+        : c
+    ),
+  }));
+
+  const enums = erd.enums
+    ?.filter((e) => Array.isArray(e.values))
+    .map((e, i) => ({ name: safeName(e.name, `enum_${i + 1}`).toLowerCase(), values: e.values.map(String) }));
+  const views = erd.views
+    ?.filter((v) => typeof v.sql === "string" && /^(select|with)\b/i.test(cleanViewSql(v.sql)) && !unsafeExpression(cleanViewSql(v.sql)))
+    .map((v, i) => ({ ...v, name: safeName(v.name, `view_${i + 1}`), sql: cleanViewSql(v.sql) }));
+
+  return { ...erd, tables: fixedTables, relationships, ...(enums ? { enums } : {}), ...(views ? { views } : {}) };
 }
 
 /**
@@ -182,7 +269,8 @@ export function normalizeErd(erd: ERD): ERD {
  * turn FK-flagged columns that lack a relationship into relationships, then
  * normalize.
  */
-export function importErd(input: ERD): ERD {
+export function importErd(raw: ERD): ERD {
+  const input = sanitizeErd(raw);
   const usedIds = new Set<string>();
   const tables = input.tables.map((table) => {
     let id = table.id || randomId("tbl");
@@ -223,7 +311,7 @@ export function importErd(input: ERD): ERD {
     }
   }
 
-  return normalizeErd({ tables, relationships });
+  return normalizeErd({ ...input, tables, relationships });
 }
 
 // ---------------------------------------------------------------------------
@@ -281,6 +369,9 @@ export function createTable(
     const columnInvalid = validateIdentifier(columnName, "column");
     if (columnInvalid) return { ok: false, error: `${name}.${columnName}: ${columnInvalid}` };
     if (columns.some((c) => c.name === columnName)) continue;
+    const typeInvalid = spec.type?.trim() ? validateDataType(spec.type) : null;
+    if (typeInvalid) return { ok: false, error: `${name}.${columnName}: ${typeInvalid}` };
+    if (spec.defaultValue?.includes(";")) return { ok: false, error: `${name}.${columnName}: default values can't contain semicolons.` };
     columns.push({
       name: columnName,
       dataType: spec.type?.trim() || "TEXT",
@@ -318,7 +409,10 @@ export function renameTable(erd: ERD, tableId: string, rawName: string): EditRes
     fromTable: r.fromTable === oldName ? name : r.fromTable,
     toTable: r.toTable === oldName ? name : r.toTable,
   }));
-  return { ok: true, erd: normalizeErd({ tables, relationships }) };
+  // Keep views pointing at the renamed table.
+  const pattern = new RegExp(`\\b${oldName}\\b`, "g");
+  const views = erd.views?.map((v) => ({ ...v, sql: v.sql.replace(pattern, name) }));
+  return { ok: true, erd: normalizeErd({ ...erd, tables, relationships, views }) };
 }
 
 export function deleteTable(erd: ERD, tableId: string): EditResult {
@@ -327,6 +421,7 @@ export function deleteTable(erd: ERD, tableId: string): EditResult {
   return {
     ok: true,
     erd: normalizeErd({
+      ...erd,
       tables: erd.tables.filter((t) => t.id !== tableId),
       relationships: erd.relationships.filter((r) => r.fromTable !== table.name && r.toTable !== table.name),
     }),
@@ -373,6 +468,9 @@ export interface ColumnPatch {
   defaultValue?: string | null;
   isPrimaryKey?: boolean;
   unique?: boolean;
+  comment?: string | null;
+  /** Generated column expression; null or "" makes it a normal column. */
+  generated?: string | null;
 }
 
 export function updateColumn(erd: ERD, tableId: string, columnName: string, patch: ColumnPatch): EditResult {
@@ -413,8 +511,18 @@ export function updateColumn(erd: ERD, tableId: string, columnName: string, patc
     currentName = name;
   }
 
+  if (patch.dataType?.trim()) {
+    const typeInvalid = validateDataType(patch.dataType);
+    if (typeInvalid) return { ok: false, error: typeInvalid };
+  }
   if (patch.defaultValue !== undefined && patch.defaultValue !== null && patch.defaultValue.includes(";")) {
     return { ok: false, error: "Default values can't contain semicolons." };
+  }
+  const generated = patch.generated === undefined ? undefined : patch.generated?.trim().replace(/^\(|\)$/g, "").trim() || null;
+  if (generated) {
+    if (generated.includes(";")) return { ok: false, error: "Generated expressions can't contain semicolons." };
+    if (patch.isPrimaryKey ?? column.isPrimaryKey) return { ok: false, error: "A primary key can't be a generated column." };
+    if (column.isForeignKey) return { ok: false, error: "A foreign key can't be a generated column." };
   }
 
   next = mapTable(next, tableId, (t) => ({
@@ -427,8 +535,13 @@ export function updateColumn(erd: ERD, tableId: string, columnName: string, patc
         dataType: patch.dataType?.trim() || c.dataType,
         // Primary key columns are always NOT NULL.
         nullable: isPrimaryKey ? false : patch.nullable ?? c.nullable,
-        defaultValue: patch.defaultValue !== undefined ? (patch.defaultValue?.trim() || null) : c.defaultValue,
+        // Postgres doesn't allow a default on a generated column.
+        defaultValue: (generated !== undefined ? generated : c.generated)
+          ? null
+          : patch.defaultValue !== undefined ? (patch.defaultValue?.trim() || null) : c.defaultValue,
         isPrimaryKey,
+        comment: patch.comment !== undefined ? (patch.comment?.trim() || null) : c.comment,
+        generated: generated !== undefined ? generated : c.generated,
       };
     }),
   }));
@@ -485,6 +598,7 @@ export function deleteColumn(erd: ERD, tableId: string, columnName: string): Edi
   return {
     ok: true,
     erd: normalizeErd({
+      ...erd,
       tables: erd.tables.map((t) =>
         t.id === tableId ? { ...t, columns: t.columns.filter((c) => c.name !== columnName) } : t
       ),
@@ -774,9 +888,116 @@ export function pasteTables(erd: ERD, clip: TableClipboard): EditResult<{ idMap:
     .filter((r) => allNames.has(r.toTable));
   return {
     ok: true,
-    erd: normalizeErd({ tables: [...erd.tables, ...newTables], relationships: [...erd.relationships, ...newRelationships] }),
+    erd: normalizeErd({ ...erd, tables: [...erd.tables, ...newTables], relationships: [...erd.relationships, ...newRelationships] }),
     idMap,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Comments, enum types and views
+// ---------------------------------------------------------------------------
+
+export function setTableComment(erd: ERD, tableId: string, comment: string | null): EditResult {
+  if (!findTable(erd, tableId)) return { ok: false, error: "Table not found." };
+  return { ok: true, erd: mapTable(erd, tableId, (t) => ({ ...t, comment: comment?.trim() || null })) };
+}
+
+// Type names an enum can't take because Postgres already uses them.
+const BUILTIN_TYPES = new Set([
+  "bigint", "bigserial", "bit", "bool", "boolean", "box", "bytea", "char", "character", "cidr", "circle", "date",
+  "decimal", "double", "float", "float4", "float8", "inet", "int", "int2", "int4", "int8", "integer", "interval",
+  "json", "jsonb", "line", "lseg", "macaddr", "money", "numeric", "path", "point", "polygon", "real", "serial",
+  "serial4", "serial8", "smallint", "smallserial", "text", "time", "timestamp", "timestamptz", "timetz", "tsquery",
+  "tsvector", "uuid", "varchar", "xml",
+]);
+
+export function enumOf(erd: ERD, dataType: string): EnumType | undefined {
+  const name = dataType.trim().toLowerCase();
+  return erd.enums?.find((e) => e.name === name);
+}
+
+/**
+ * Create or update an enum type. Renaming it (`previousName`) updates every
+ * column that uses it.
+ */
+export function upsertEnum(erd: ERD, rawName: string, rawValues: string[], previousName?: string): EditResult {
+  const name = rawName.trim();
+  const invalid = validateIdentifier(name, "column");
+  if (invalid) return { ok: false, error: invalid.replace("Column name", "Type name") };
+  if (BUILTIN_TYPES.has(name)) return { ok: false, error: `"${name}" is a built-in type. Try "${name}_kind".` };
+  if (erd.tables.some((t) => t.name === name) || erd.views?.some((v) => v.name === name)) {
+    return { ok: false, error: `"${name}" is already used by a table or view.` };
+  }
+  const enums = erd.enums ?? [];
+  if (name !== previousName && enums.some((e) => e.name === name)) return { ok: false, error: `An enum named "${name}" already exists.` };
+
+  const values = rawValues.map((v) => v.trim()).filter(Boolean);
+  if (values.length === 0) return { ok: false, error: "An enum needs at least one value." };
+  if (new Set(values).size !== values.length) return { ok: false, error: "Enum values must be unique." };
+  const tooLong = values.find((v) => v.length > 63);
+  if (tooLong) return { ok: false, error: `"${tooLong.slice(0, 20)}…" is longer than 63 characters.` };
+
+  const next = previousName && enums.some((e) => e.name === previousName)
+    ? enums.map((e) => (e.name === previousName ? { name, values } : e))
+    : [...enums, { name, values }];
+  const tables =
+    previousName && previousName !== name
+      ? erd.tables.map((t) => ({
+          ...t,
+          columns: t.columns.map((c) => (c.dataType.toLowerCase() === previousName ? { ...c, dataType: name } : c)),
+        }))
+      : erd.tables;
+  return { ok: true, erd: { ...erd, tables, enums: next } };
+}
+
+/** Remove an enum type; columns that used it become TEXT. */
+export function deleteEnum(erd: ERD, name: string): EditResult {
+  if (!erd.enums?.some((e) => e.name === name)) return { ok: false, error: `Enum "${name}" not found.` };
+  return {
+    ok: true,
+    erd: {
+      ...erd,
+      enums: erd.enums.filter((e) => e.name !== name),
+      tables: erd.tables.map((t) => ({
+        ...t,
+        columns: t.columns.map((c) => (c.dataType.toLowerCase() === name ? { ...c, dataType: "TEXT" } : c)),
+      })),
+    },
+  };
+}
+
+/** Normalise a view body: no trailing semicolon, no blank lines. */
+export function cleanViewSql(sql: string): string {
+  return sql
+    .trim()
+    .replace(/;+\s*$/, "")
+    .split("\n")
+    .map((line) => line.replace(/\s+$/, ""))
+    .filter((line) => line.trim() !== "")
+    .join("\n");
+}
+
+export function upsertView(erd: ERD, view: { id?: string; name: string; sql: string }): EditResult<{ viewId: string }> {
+  const name = view.name.trim();
+  const invalid = validateIdentifier(name, "table");
+  if (invalid) return { ok: false, error: invalid.replace("Table name", "View name") };
+  const views = erd.views ?? [];
+  if (erd.tables.some((t) => t.name === name) || views.some((v) => v.name === name && v.id !== view.id)) {
+    return { ok: false, error: `"${name}" is already used by a table or view.` };
+  }
+  const sql = cleanViewSql(view.sql);
+  if (!/^(select|with)\b/i.test(sql)) return { ok: false, error: "A view must be a SELECT (or WITH … SELECT) query." };
+  if (sql.includes(";")) return { ok: false, error: "A view is a single query: remove the semicolons." };
+  const viewId = view.id && views.some((v) => v.id === view.id) ? view.id : randomId("view");
+  const nextViews = views.some((v) => v.id === viewId)
+    ? views.map((v) => (v.id === viewId ? { id: viewId, name, sql } : v))
+    : [...views, { id: viewId, name, sql }];
+  return { ok: true, erd: { ...erd, views: nextViews }, viewId };
+}
+
+export function deleteView(erd: ERD, viewId: string): EditResult {
+  if (!erd.views?.some((v) => v.id === viewId)) return { ok: false, error: "View not found." };
+  return { ok: true, erd: { ...erd, views: erd.views.filter((v) => v.id !== viewId) } };
 }
 
 export const EMPTY_ERD: ERD = { tables: [], relationships: [] };

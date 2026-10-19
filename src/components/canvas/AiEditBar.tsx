@@ -32,7 +32,7 @@ export function AiEditBar() {
     const failed = results.length - applied;
     const visible = showAll ? results : results.slice(0, 6);
     return (
-      <div className="absolute top-16 right-3 xl:top-3 max-md:top-auto max-md:bottom-3 max-md:left-3 z-30 w-[480px] max-w-[calc(100%-24px)] max-md:w-auto rounded-xl border border-border bg-surface shadow-xl">
+      <div className="absolute bottom-3 left-3 right-3 mx-auto max-w-[520px] @min-[1040px]:bottom-auto @min-[1040px]:top-3 @min-[1040px]:left-auto @min-[1040px]:mx-0 @min-[1040px]:w-[480px] z-30 rounded-xl border border-border bg-surface shadow-xl">
         <div className="px-4 pt-3 pb-2 flex items-start gap-2.5">
           <span className="mt-0.5 text-accent"><Sparkle /></span>
           <div className="min-w-0 flex-1">
@@ -94,7 +94,7 @@ export function AiEditBar() {
   };
 
   return (
-    <div className="absolute top-16 right-3 xl:top-3 max-md:top-auto max-md:bottom-3 max-md:left-3 z-30 w-[420px] max-w-[calc(100%-24px)] xl:max-w-[calc(100%-480px)] min-w-[240px] max-md:w-auto">
+    <div className="absolute bottom-3 left-3 right-3 mx-auto max-w-[520px] @min-[1040px]:bottom-auto @min-[1040px]:top-3 @min-[1040px]:left-auto @min-[1040px]:mx-0 @min-[1040px]:w-[420px] z-30">
       <form
         onSubmit={(e) => {
           e.preventDefault();

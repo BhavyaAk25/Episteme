@@ -97,7 +97,22 @@ export function CommandPalette() {
                 void useSimulationStore.getState().runTests();
               },
             },
-            { id: "issues", label: "Show issues", hint: "Design checks and test results", group: "Actions" as const, run: () => ui.openDrawer() },
+            { id: "issues", label: "Show issues", hint: "Design checks and test results", group: "Actions" as const, run: () => ui.showVerifyTab("issues") },
+            { id: "query", label: "Query playground", hint: "Run SQL on sample data, or ask in English", group: "Actions" as const, run: () => ui.showVerifyTab("query") },
+            { id: "explain", label: "Explain this schema", hint: "Plain-English tour of the tables", group: "Actions" as const, run: () => ui.setExplainOpen(true) },
+            { id: "new-enum", label: "New enum type…", hint: "A fixed list of allowed values", group: "Actions" as const, run: () => ui.setObjectEditor({ kind: "enum" }) },
+            { id: "new-view", label: "New view…", hint: "A saved query", group: "Actions" as const, run: () => ui.setObjectEditor({ kind: "view" }) },
+            ...(useProjectsStore.getState().versions.length
+              ? [
+                  {
+                    id: "migration",
+                    label: "Migration SQL…",
+                    hint: "ALTER statements from the last saved version",
+                    group: "Actions" as const,
+                    run: () => ui.setMigrationFrom(useProjectsStore.getState().versions[0].id),
+                  },
+                ]
+              : []),
             { id: "export", label: "Export…", hint: "SQL, Prisma, Drizzle, PNG, share link", group: "Actions" as const, run: () => ui.openExportModal() },
             {
               id: "replay",
