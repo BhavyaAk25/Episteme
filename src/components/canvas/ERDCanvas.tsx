@@ -43,6 +43,9 @@ function isTypingTarget(target: EventTarget | null): boolean {
   return target.isContentEditable || tag === "input" || tag === "textarea" || tag === "select";
 }
 
+const FOCUS_MIN_TABLES = 12;
+const SAFE_ID = /^[A-Za-z0-9_-]+$/;
+
 export function ERDCanvas() {
   const { viewErd, locked: replaying, previewing } = useReplayView();
   const savedPositions = useErdStore((state) => state.positions);
@@ -60,6 +63,24 @@ export function ERDCanvas() {
   const { openInspector } = useUIStore();
 
   const nodeSignatures = useRef(new Map<string, string>());
+
+  // Big schemas: when a table is selected, fade everything it isn't linked
+  // to, so its neighbourhood is readable. Done in CSS so no node re-renders.
+  const focusCss = useMemo(() => {
+    if (!viewErd || viewErd.tables.length <= FOCUS_MIN_TABLES || !selectedNodeId) return "";
+    const table = viewErd.tables.find((t) => t.id === selectedNodeId);
+    if (!table) return "";
+    const rels = viewErd.relationships.filter((r) => r.fromTable === table.name || r.toTable === table.name);
+    const names = new Set([table.name, ...rels.flatMap((r) => [r.fromTable, r.toTable])]);
+    const nodeIds = viewErd.tables.filter((t) => names.has(t.name)).map((t) => t.id);
+    const ids = [...nodeIds, ...rels.map((r) => r.id)];
+    if (!ids.every((id) => SAFE_ID.test(id))) return "";
+    const not = (list: string[]) => list.map((id) => `:not([data-id="${id}"])`).join("");
+    return (
+      `.erd-focus .react-flow__node${not(nodeIds)}{opacity:.25}` +
+      `.erd-focus .react-flow__edge${not(rels.map((r) => r.id))}{opacity:.12}`
+    );
+  }, [viewErd, selectedNodeId]);
 
   // Rebuild React Flow nodes whenever the ERD (or its layout) changes, keeping
   // what React Flow already knows about each node (measured size, selection).
@@ -235,7 +256,8 @@ export function ERDCanvas() {
   const showEmptyState = !isGenerating && !generationError && nodes.length === 0 && !replaying;
 
   return (
-    <div className="w-full h-full">
+    <div className={`w-full h-full ${focusCss ? "erd-focus" : ""}`}>
+      {focusCss && <style>{focusCss}</style>}
       <CrowsFootMarkers />
       <ReactFlow
         nodes={nodes}

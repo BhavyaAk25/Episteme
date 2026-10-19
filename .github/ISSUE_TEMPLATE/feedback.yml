@@ -1,0 +1,33 @@
+name: Feedback
+description: Something confusing, broken or missing in Episteme
+labels: [feedback]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of feedback?
+      options:
+        - Something is broken
+        - Something was confusing
+        - A feature I need
+        - The AI made a bad schema or fix
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+      placeholder: "I clicked …, expected …, but …"
+    validations:
+      required: true
+  - type: textarea
+    id: schema
+    attributes:
+      label: Share link or SQL (optional)
+      description: Export → Copy share link reproduces your schema exactly. Don't include real data or secrets.
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and device (optional)
+      placeholder: Chrome 140 on macOS

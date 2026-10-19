@@ -6,7 +6,9 @@ import { useSimulationStore } from "@/store/useSimulationStore";
 import { useUIStore, type VerifyTab as Tab } from "@/store/useUIStore";
 import { useErdStore } from "@/store/useErdStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
+import { useProjectsStore } from "@/store/useProjectsStore";
 import { useAiEditStore } from "@/store/useAiEditStore";
+import { useReviewStore } from "@/store/useReviewStore";
 import { useIssues, applyIssueFixes, askAiAboutIssue } from "@/lib/verify/useIssues";
 import { QueryTab } from "./QueryTab";
 import { ResultTable } from "./ResultTable";
@@ -30,7 +32,12 @@ function IssueRow({ issue }: { issue: Issue }) {
     <li className="px-4 py-2.5 flex items-start gap-3 border-b border-border/60 last:border-b-0">
       <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${style.dot}`} title={style.label} />
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] text-foreground leading-snug">{issue.title}</p>
+        <p className="text-[13px] text-foreground leading-snug">
+          {issue.id.startsWith("review:") && (
+            <span className="mr-1.5 align-[1px] px-1.5 py-px rounded bg-accent/10 text-accent text-[10px] font-semibold uppercase tracking-wide">AI review</span>
+          )}
+          {issue.title}
+        </p>
         <p className="mt-0.5 text-[12px] text-muted leading-snug">{issue.detail}</p>
       </div>
       <div className="flex items-center gap-1.5 shrink-0">
@@ -44,6 +51,15 @@ function IssueRow({ issue }: { issue: Issue }) {
             className="h-7 px-2 rounded-md text-[11px] text-muted hover:text-foreground hover:bg-foreground/[0.04]"
           >
             Show
+          </button>
+        )}
+        {issue.id.startsWith("review:") && (
+          <button
+            onClick={() => useReviewStore.getState().dismiss(issue.id)}
+            className="h-7 px-2 rounded-md text-[11px] text-muted hover:text-foreground hover:bg-foreground/[0.04]"
+            title="Not a problem for this design"
+          >
+            Dismiss
           </button>
         )}
         {issue.fix ? (
@@ -84,6 +100,31 @@ function TestRow({ test }: { test: DbTest }) {
   );
 }
 
+function ReviewButton() {
+  const status = useReviewStore((s) => s.status);
+  return (
+    <button
+      onClick={() => void useReviewStore.getState().review()}
+      disabled={status === "loading"}
+      title="Ask the AI to review the design against your description"
+      className="h-8 px-3 rounded-md border border-border text-[12px] font-medium text-foreground hover:bg-foreground/[0.04] disabled:opacity-50 inline-flex items-center gap-1.5"
+    >
+      {status === "loading" && <span className="w-3 h-3 border-2 border-foreground/30 border-t-foreground rounded-full animate-spin" />}
+      {status === "loading" ? "Reviewing…" : "Review with AI"}
+    </button>
+  );
+}
+
+function ReviewStatus() {
+  const { status, error, findings, projectId } = useReviewStore();
+  const currentProject = useProjectsStore((s) => s.currentProjectId);
+  if (status === "error" && error) return <p className="px-4 py-2 text-[12px] text-error border-b border-border/60">AI review: {error}</p>;
+  if (status === "done" && projectId === currentProject && findings.length === 0) {
+    return <p className="px-4 py-2 text-[12px] text-success border-b border-border/60">AI review: no design problems found against your description.</p>;
+  }
+  return null;
+}
+
 /** Bottom panel: design issues, real-Postgres test results and sample rows. */
 export function VerifyPanel() {
   const hasTables = useErdStore((state) => (state.erd?.tables.length ?? 0) > 0);
@@ -98,12 +139,13 @@ export function VerifyPanel() {
     () => ({
       error: issues.filter((i) => i.severity === "error").length,
       warning: issues.filter((i) => i.severity === "warning").length,
-      info: issues.filter((i) => i.severity === "info").length,
+      info: issues.filter((i) => i.severity === "info" && !i.id.startsWith("review:")).length,
     }),
     [issues]
   );
   const fixable = issues.filter((i) => i.fix && i.severity !== "info");
-  const visibleIssues = showInfo ? issues : issues.filter((i) => i.severity !== "info");
+  // AI review findings were asked for, so they always show.
+  const visibleIssues = showInfo ? issues : issues.filter((i) => i.severity !== "info" || i.id.startsWith("review:"));
   const passed = run?.tests.filter((t) => t.status === "pass").length ?? 0;
   const failed = run?.tests.filter((t) => t.status === "fail").length ?? 0;
   const skipped = run?.tests.filter((t) => t.status === "skip").length ?? 0;
@@ -171,6 +213,7 @@ export function VerifyPanel() {
                   ))}
                 </div>
                 <div className="flex items-center gap-2">
+                  {tab === "issues" && <ReviewButton />}
                   {tab === "issues" && fixable.length > 0 && (
                     <button onClick={() => applyIssueFixes(fixable)} className="h-8 px-3 rounded-md bg-brand text-brand-ink text-[12px] font-semibold">
                       Fix all {fixable.length}
@@ -193,6 +236,7 @@ export function VerifyPanel() {
 
                 {tab === "issues" && (
                   <>
+                    <ReviewStatus />
                     {visibleIssues.length === 0 ? (
                       <p className="px-4 py-6 text-[13px] text-muted text-center">
                         No errors or warnings.{" "}

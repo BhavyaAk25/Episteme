@@ -1,6 +1,7 @@
 import { useErdStore } from "@/store/useErdStore";
 import { describeErdForAi } from "@/lib/erd/applyOps";
-import type { ExplainAnswer } from "@/lib/gemini/schemas";
+import type { ExplainAnswer, ReviewAnswer } from "@/lib/gemini/schemas";
+import { useProjectStore } from "@/store/useProjectStore";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -23,6 +24,10 @@ async function callAssist<T>(payload: Record<string, unknown>): Promise<Result<T
 
 /** Turn a plain-English question into SQL for the current schema. */
 export const askForSql = (question: string) => callAssist<{ sql: string; explanation: string }>({ task: "sql", question });
+
+/** AI design review against the original requirement. */
+export const askForReview = () =>
+  callAssist<ReviewAnswer>({ task: "review", requirement: useProjectStore.getState().prompt?.slice(0, 4000) ?? "" });
 
 /** AI explanation of the current schema. */
 export const askForExplanation = () => callAssist<ExplainAnswer>({ task: "explain" });

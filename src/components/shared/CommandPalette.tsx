@@ -6,6 +6,8 @@ import { useErdStore } from "@/store/useErdStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useProjectsStore } from "@/store/useProjectsStore";
+import { useReviewStore } from "@/store/useReviewStore";
+import { FEEDBACK_URL } from "@/lib/feedback";
 import { useSimulationStore } from "@/store/useSimulationStore";
 import { TEMPLATES, loadTemplate } from "@/lib/actions/templates";
 
@@ -57,7 +59,21 @@ export function CommandPalette() {
   }, [setPaletteOpen]);
 
   useEffect(() => {
-    if (paletteOpen) setTimeout(() => inputRef.current?.focus(), 0);
+    if (!paletteOpen) return;
+    // Focus now and once more after paint (the opening keystroke can steal it).
+    inputRef.current?.focus();
+    const timer = window.setTimeout(() => inputRef.current?.focus(), 50);
+    // Typing while focus is elsewhere still goes into the search box.
+    const onKeyDown = (event: KeyboardEvent) => {
+      const input = inputRef.current;
+      if (!input || document.activeElement === input || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key.length === 1) input.focus();
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("keydown", onKeyDown, true);
+    };
   }, [paletteOpen]);
 
   const commands = useMemo<Command[]>(() => {
@@ -99,6 +115,16 @@ export function CommandPalette() {
             },
             { id: "issues", label: "Show issues", hint: "Design checks and test results", group: "Actions" as const, run: () => ui.showVerifyTab("issues") },
             { id: "query", label: "Query playground", hint: "Run SQL on sample data, or ask in English", group: "Actions" as const, run: () => ui.showVerifyTab("query") },
+            {
+              id: "review",
+              label: "Review design with AI",
+              hint: "Business-level problems against your description",
+              group: "Actions" as const,
+              run: () => {
+                ui.showVerifyTab("issues");
+                void useReviewStore.getState().review();
+              },
+            },
             { id: "explain", label: "Explain this schema", hint: "Plain-English tour of the tables", group: "Actions" as const, run: () => ui.setExplainOpen(true) },
             { id: "new-enum", label: "New enum type…", hint: "A fixed list of allowed values", group: "Actions" as const, run: () => ui.setObjectEditor({ kind: "enum" }) },
             { id: "new-view", label: "New view…", hint: "A saved query", group: "Actions" as const, run: () => ui.setObjectEditor({ kind: "view" }) },
@@ -128,6 +154,13 @@ export function CommandPalette() {
         : []),
       { id: "import", label: "Import SQL…", hint: "Paste CREATE TABLE statements", group: "Actions", run: () => ui.setImportOpen(true) },
       { id: "shortcuts", label: "Keyboard shortcuts", hint: "?", group: "Actions", run: () => ui.setShortcutsOpen(true) },
+      {
+        id: "feedback",
+        label: "Send feedback",
+        hint: "Report a problem or ask for a feature",
+        group: "Actions",
+        run: () => window.open(FEEDBACK_URL, "_blank", "noopener,noreferrer"),
+      },
       { id: "tour", label: "Take the tour", hint: "A 4-step introduction", group: "Actions", run: () => ui.setTourOpen(true) },
       { id: "detail-full", label: "View: all columns", hint: "Column detail", group: "Actions", run: () => ui.setNodeDetail("full") },
       { id: "detail-keys", label: "View: keys only", hint: "Column detail", group: "Actions", run: () => ui.setNodeDetail("keys") },
@@ -169,6 +202,7 @@ export function CommandPalette() {
       <div role="dialog" aria-modal="true" aria-label="Command palette" className="w-[560px] max-w-full rounded-xl border border-border bg-surface shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <input
           ref={inputRef}
+          autoFocus
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);

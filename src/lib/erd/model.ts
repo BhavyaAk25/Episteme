@@ -276,11 +276,14 @@ export function importErd(raw: ERD): ERD {
     let id = table.id || randomId("tbl");
     while (usedIds.has(id)) id = randomId("tbl");
     usedIds.add(id);
+    const constraints = table.constraints ?? [];
+    const uniqueKeys = new Set(constraints.filter((c) => c.type === "UNIQUE").map((c) => c.columns.join(",")));
     return {
       ...table,
       id,
-      constraints: table.constraints ?? [],
-      indexes: table.indexes ?? [],
+      constraints,
+      // A unique index on exactly the columns of a UNIQUE constraint is a duplicate.
+      indexes: (table.indexes ?? []).filter((i) => !(i.unique && uniqueKeys.has(i.columns.join(",")))),
     };
   });
 
@@ -786,6 +789,23 @@ export function addRelationship(
     required: fromColumn ? !fromColumn.nullable : true,
     onDelete: "RESTRICT",
   };
+
+  // Foreign keys are joined and checked on every parent delete: index them
+  // unless the column already leads an index, a UNIQUE or the primary key.
+  const owner = next.tables.find((t) => t.id === from.id);
+  if (owner) {
+    const pk = owner.columns.filter((c) => c.isPrimaryKey).map((c) => c.name);
+    const covered =
+      pk[0] === fromColumnName ||
+      owner.indexes.some((i) => i.columns[0] === fromColumnName) ||
+      owner.constraints.some((c) => c.type === "UNIQUE" && c.columns[0] === fromColumnName);
+    if (!covered) {
+      let name = `idx_${owner.name}_${fromColumnName}`.slice(0, 63);
+      const taken = new Set(next.tables.flatMap((t) => t.indexes.map((i) => i.name)));
+      for (let n = 2; taken.has(name); n += 1) name = `idx_${owner.name}_${fromColumnName}_${n}`.slice(0, 63);
+      next = mapTable(next, owner.id, (t) => ({ ...t, indexes: [...t.indexes, { name, columns: [fromColumnName], unique: false }] }));
+    }
+  }
 
   return {
     ok: true,

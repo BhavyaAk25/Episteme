@@ -87,7 +87,7 @@ export function reconcileOntologyWithErd(ontology: Ontology, erd: ERD): Ontology
       id: nextId,
       name: matched?.name?.trim() ? matched.name : humanizeTableName(table.name),
       description:
-        matched?.description?.trim() ? matched.description : `Derived from ERD table "${table.name}".`,
+        matched?.description?.trim() ? matched.description : table.comment?.trim() || "",
       status: matched?.status ?? "active",
       confidence: matched?.confidence ?? "medium",
       implementsInterfaces: matched?.implementsInterfaces ?? [],

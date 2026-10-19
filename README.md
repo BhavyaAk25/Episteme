@@ -11,9 +11,9 @@ Describe your system, for example _"event ticketing with venues, events, ticket 
 ## What you can do
 
 ### Start
-- **Describe it**: the AI writes the schema while you watch. Progress is streamed live, so you see each phase and each table name as it's designed.
+- **Describe it**: the AI writes the schema while you watch. Progress is streamed live, so you see each phase and each table name as it's designed. It models everything the description mentions (no table limit), and safe design fixes such as foreign-key indexes and money types are applied automatically.
 - **Start from a template**: inventory, SaaS or e-commerce, editable like anything else.
-- **Import SQL**: paste `CREATE TABLE` statements or upload a dump (`pg_dump --schema-only`; simple MySQL dumps work too). Episteme runs it in Postgres and reads the real catalog back, so types, defaults, CHECKs, indexes and every `ON DELETE` rule come through exactly.
+- **Import SQL**: paste `CREATE TABLE` statements or upload a dump. The dialog gives the exact command for Postgres (Supabase, Neon…), MySQL, SQLite, Prisma or Drizzle; Episteme never connects to your database. Episteme runs it in Postgres and reads the real catalog back, so types, defaults, CHECKs, indexes and every `ON DELETE` rule come through exactly.
 - **Blank canvas**: build it yourself.
 
 ### Edit
@@ -21,6 +21,7 @@ Describe your system, for example _"event ticketing with venues, events, ticket 
 - **Draw foreign keys**: drag from a column to another table's key. A correctly typed `<table>_id` column is created when needed. Set 1:1 or 1:N, required, and ON DELETE in plain language.
 - **Crow's-foot notation**: lines connect column to column and show optionality and cardinality. **Tidy up** re-lays out the diagram (ELK).
 - **Postgres features**: enum types, column and table comments, generated (computed) columns and views, all exported and tested.
+- **Big schemas**: select a table to fade everything it isn't linked to; layout stays fast at 100+ tables.
 - **Work fast**: ⌘K command palette, multi-select with align/distribute/color, copy/paste and duplicate (relationships come along), column detail levels (all / keys / names) for big diagrams.
 - **Undo/redo everything** (⌘Z / ⌘⇧Z). Names are validated (snake_case, no reserved words), and renames update every reference.
 - **Ask AI to change…**: "add product reviews with a 1–5 rating". The AI proposes small edit operations, applied with the same validation as manual edits. You preview them on the canvas (new tables green, changed tables amber), then apply or discard.
@@ -41,6 +42,8 @@ Describe your system, for example _"event ticketing with venues, events, ticket 
 
   Issues without a safe automatic fix get **Ask AI to fix**.
 - **Prompt coverage**: flags things you mentioned that no table stores.
+- **Review with AI**: a senior-architect review against your description finds business-level problems the rules can't (wrong cardinality, missing history, unenforced requirements).
+- **Ask AI to fix, checked**: every AI fix is re-tested (in Postgres for database errors) before you apply it, retried once if it doesn't work, and never deletes tables or unrelated columns.
 - **Query playground**: run SQL against the sample rows in the same in-browser Postgres, start from example joins, or ask in English and get SQL to review.
 - **Explain this schema**: a plain-English tour of every table and how they connect, offline or written by the AI.
 
@@ -52,6 +55,7 @@ Describe your system, for example _"event ticketing with venues, events, ticket 
   - the diagram as PNG or SVG
 - **Share link**: the whole schema is packed into the link itself, so nothing is uploaded. Whoever opens it gets their own editable copy.
 - **Light and dark themes**, plus keyboard shortcuts (press `?`).
+- **Feedback**: found something broken or confusing? [Open a feedback issue](https://github.com/BhavyaAk25/Episteme/issues/new?template=feedback.yml).
 
 ---
 

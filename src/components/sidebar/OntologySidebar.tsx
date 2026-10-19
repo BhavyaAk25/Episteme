@@ -4,6 +4,7 @@ import { useProjectStore } from "@/store/useProjectStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
 import { useErdStore } from "@/store/useErdStore";
 import { TABLE_COLORS } from "@/lib/erd/colors";
+import { FEEDBACK_URL } from "@/lib/feedback";
 import { useUIStore } from "@/store/useUIStore";
 import { SidebarLoadingSkeleton } from "@/components/shared/LoadingStates";
 import { TemplateSelector } from "./TemplateSelector";
@@ -36,6 +37,7 @@ function ObjectList({
             <button
               key={item.key}
               onClick={item.onClick}
+              aria-label={`${item.name}: ${item.detail}`}
               className="w-full text-left px-3 py-1.5 rounded-lg bg-elevated/60 border border-transparent hover:bg-elevated hover:border-border/60"
             >
               <span className="block font-mono text-[12px] font-semibold text-foreground truncate">{item.name}</span>
@@ -132,6 +134,8 @@ export function OntologySidebar() {
                             <button
                               key={table.id}
                               onClick={() => handleTableClick(table.id)}
+                              aria-label={`${table.name}, ${table.columns.length} columns${isSelected ? ", selected" : ""}`}
+                              aria-current={isSelected ? "true" : undefined}
                               className={`w-full text-left px-3 py-2 rounded-lg border transition-colors ${
                                 isSelected
                                   ? "bg-elevated border-accent/40"
@@ -187,15 +191,17 @@ export function OntologySidebar() {
                   <div className="mt-10">
                     <SidebarLoadingSkeleton />
                   </div>
-                ) : (
-                  <div className="mt-8 text-muted">
-                    <p>No ontology yet.</p>
-                    <p className="mt-1 text-sm">
-                      Enter a system description and click Generate.
-                    </p>
-                  </div>
-                )}
+                ) : null}
               </div>
+            </div>
+            <div className="shrink-0 px-5 py-2.5 border-t border-border/60 flex items-center gap-3 text-[12px]">
+              <a href={FEEDBACK_URL} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
+                Send feedback
+              </a>
+              <span className="text-muted">·</span>
+              <a href="https://github.com/BhavyaAk25/Episteme" target="_blank" rel="noopener noreferrer" className="text-muted hover:text-foreground">
+                Source
+              </a>
             </div>
           </motion.div>
         )}

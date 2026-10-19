@@ -57,6 +57,7 @@ describe("edit model", () => {
     const posts = blog().tables.find((t) => t.name === "posts")!;
     const fk = posts.columns.find((c) => c.name === "author_id");
     expect(fk).toMatchObject({ dataType: "INTEGER", isForeignKey: true, referencesTable: "authors", referencesColumn: "id" });
+    expect(posts.indexes).toEqual([{ name: "idx_posts_author_id", columns: ["author_id"], unique: false }]);
   });
 
   it("renames update relationships, CHECKs and views", () => {

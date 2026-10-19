@@ -2,8 +2,15 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAiProvider } from "@/lib/ai/provider";
 import { getGeminiErrorInfo, extractJSON } from "@/lib/gemini/client";
-import { EXPLAIN_SYSTEM_PROMPT, SQL_SYSTEM_PROMPT, explainUserContent, sqlUserContent } from "@/lib/gemini/prompts";
-import { ExplainAnswerSchema, SqlAnswerSchema } from "@/lib/gemini/schemas";
+import {
+  EXPLAIN_SYSTEM_PROMPT,
+  REVIEW_SYSTEM_PROMPT,
+  SQL_SYSTEM_PROMPT,
+  explainUserContent,
+  reviewUserContent,
+  sqlUserContent,
+} from "@/lib/gemini/prompts";
+import { ExplainAnswerSchema, ReviewAnswerSchema, SqlAnswerSchema } from "@/lib/gemini/schemas";
 import { checkRateLimit, clientKey } from "@/lib/server/rateLimit";
 
 export const maxDuration = 60;
@@ -21,6 +28,11 @@ const RequestSchema = z.discriminatedUnion("task", [
   }),
   z.object({
     task: z.literal("explain"),
+    schemaText: z.string().min(1).max(MAX_SCHEMA_TEXT_LENGTH),
+  }),
+  z.object({
+    task: z.literal("review"),
+    requirement: z.string().max(4000).optional(),
     schemaText: z.string().min(1).max(MAX_SCHEMA_TEXT_LENGTH),
   }),
 ]);
@@ -59,11 +71,16 @@ export async function POST(request: Request) {
   }
 
   const input = parsed.data;
+  const prompts =
+    input.task === "sql"
+      ? { system: SQL_SYSTEM_PROMPT, user: sqlUserContent(input.schemaText, input.question) }
+      : input.task === "review"
+        ? { system: REVIEW_SYSTEM_PROMPT, user: reviewUserContent(input.requirement ?? "", input.schemaText) }
+        : { system: EXPLAIN_SYSTEM_PROMPT, user: explainUserContent(input.schemaText) };
   let raw: string;
   try {
     raw = await provider.generateJson({
-      system: input.task === "sql" ? SQL_SYSTEM_PROMPT : EXPLAIN_SYSTEM_PROMPT,
-      user: input.task === "sql" ? sqlUserContent(input.schemaText, input.question) : explainUserContent(input.schemaText),
+      ...prompts,
       operation: "assist",
       maxOutputTokens: input.task === "sql" ? 2048 : 4096,
       temperature: 0.2,
@@ -86,7 +103,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "The AI returned an unreadable answer. Try again." }, { status: 502 });
   }
 
-  const answer = input.task === "sql" ? SqlAnswerSchema.safeParse(json) : ExplainAnswerSchema.safeParse(json);
+  const answer =
+    input.task === "sql"
+      ? SqlAnswerSchema.safeParse(json)
+      : input.task === "review"
+        ? ReviewAnswerSchema.safeParse(json)
+        : ExplainAnswerSchema.safeParse(json);
   if (!answer.success) {
     return NextResponse.json({ error: "The AI answered in an unexpected format. Try again." }, { status: 502 });
   }
