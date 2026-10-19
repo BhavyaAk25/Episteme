@@ -1,5 +1,8 @@
 import { useProjectStore } from "@/store/useProjectStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
+import { autoFixErd } from "@/lib/verify/linter";
+import { applyOps } from "@/lib/erd/applyOps";
+import { useUIStore } from "@/store/useUIStore";
 import { useSimulationStore } from "@/store/useSimulationStore";
 import { useErdStore } from "@/store/useErdStore";
 import { useProjectsStore } from "@/store/useProjectsStore";
@@ -79,7 +82,9 @@ export async function generateSchema(): Promise<void> {
   if (result.erd) {
     // Lay out before loading so the new schema arrives as one undoable step
     // (Undo brings back whatever was on the canvas before).
-    const erd = importErd(result.erd);
+    // Apply the safe built-in design fixes (FK indexes, money types, …) so
+    // a fresh schema starts clean; anything that needs judgement stays listed.
+    const { erd, fixed } = autoFixErd(importErd(result.erd), (base, ops) => applyOps(base, ops).erd);
     let positions = {};
     try {
       positions = await layoutErd(erd);
@@ -91,6 +96,10 @@ export async function generateSchema(): Promise<void> {
     useErdStore.getState().loadErd(erd, positions);
     useCanvasStore.getState().requestFit();
     await projects.addVersion(`Generated: ${prompt.slice(0, 80)}`);
+    if (fixed.length) {
+      const kinds = [...new Set(fixed.map((label) => label.replace(/ to .*$/, "").replace(/^Use /, "").toLowerCase()))];
+      useUIStore.getState().showNotice(`Tidied ${fixed.length} design detail${fixed.length === 1 ? "" : "s"} automatically (${kinds.join(", ")}).`);
+    }
 
     // Name an untitled project after what was generated.
     const current = projects.projects.find((p) => p.id === projects.currentProjectId);

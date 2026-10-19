@@ -7,6 +7,7 @@ import { useProjectsStore } from "@/store/useProjectsStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
 import { importErd } from "@/lib/erd/model";
 import { layoutErd } from "@/lib/erd/layout";
+import { FromDatabase } from "./FromDatabase";
 
 const EXAMPLE = `CREATE TABLE authors (
   id SERIAL PRIMARY KEY,
@@ -93,19 +94,20 @@ export function ImportModal() {
               <div>
                 <h2 className="text-[16px] font-semibold text-foreground">Import SQL</h2>
                 <p className="text-[12px] text-muted">
-                  Paste CREATE TABLE statements (PostgreSQL, e.g. <span className="font-mono">pg_dump --schema-only</span>; simple MySQL dumps work too). It opens as a new project.
+                  Paste CREATE TABLE statements (PostgreSQL, e.g. <span className="font-mono">pg_dump --schema-only</span>; MySQL and SQLite dumps work too). It opens as a new project.
                 </p>
               </div>
               <button onClick={close} aria-label="Close" className="w-8 h-8 rounded-lg text-muted hover:text-foreground hover:bg-foreground/5">×</button>
             </div>
             <div className="p-5 space-y-3">
+              <FromDatabase />
               <textarea
                 value={sql}
                 onChange={(e) => setSql(e.target.value)}
                 placeholder={EXAMPLE}
                 spellCheck={false}
                 aria-label="SQL to import"
-                className="w-full h-64 p-3 rounded-lg border border-border bg-canvas font-mono text-[12px] text-foreground placeholder:text-muted/70 focus:outline-none focus:border-accent resize-y"
+                className="w-full h-52 p-3 rounded-lg border border-border bg-canvas font-mono text-[12px] text-foreground placeholder:text-muted/70 focus:outline-none focus:border-accent resize-y"
               />
               <div className="flex items-center gap-2">
                 <label className="text-[12px] text-muted shrink-0" htmlFor="import-name">Project name</label>

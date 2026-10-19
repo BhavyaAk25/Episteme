@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useUIStore } from "@/store/useUIStore";
+import { FEEDBACK_URL } from "@/lib/feedback";
 
 const isTyping = (target: EventTarget | null) =>
   target instanceof HTMLElement && (target.isContentEditable || ["input", "textarea", "select"].includes(target.tagName.toLowerCase()));
@@ -75,6 +76,7 @@ export function ShortcutsDialog() {
           >
             Take the 4-step tour
           </button>
+          <a href={FEEDBACK_URL} target="_blank" rel="noopener noreferrer" className="text-[12px] text-accent hover:underline">Send feedback</a>
         </div>
       </div>
     </div>

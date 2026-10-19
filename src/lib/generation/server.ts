@@ -39,6 +39,15 @@ export function sanitizeERD(erd: ERD): ERD {
   };
 }
 
+/** Use the plan's entity descriptions for tables the model left undescribed. */
+function describeTables(erd: ERD, plan: Plan): ERD {
+  const byName = new Map(plan.entities.map((e) => [e.name.toLowerCase().replace(/[\s-]+/g, "_"), e.description]));
+  return {
+    ...erd,
+    tables: erd.tables.map((t) => (t.comment ? t : { ...t, comment: byName.get(t.name) || null })),
+  };
+}
+
 function toFrontend(data: ModelResponse): { plan: Plan; ontology: Ontology; erd: ERD } {
   const plan: Plan = {
     domain: data.plan.domain,
@@ -101,6 +110,7 @@ function toFrontend(data: ModelResponse): { plan: Plan; ontology: Ontology; erd:
         referencesColumn: c.references_column,
       })),
       constraints: t.constraints.map((c) => ({ type: c.type, columns: c.columns, expression: c.expression, onDelete: c.on_delete })),
+      comment: t.description || null,
       indexes: t.indexes.map((i) => ({ name: i.name, columns: i.columns, unique: i.unique })),
     })),
     relationships: data.erd.relationships.map((r) => ({
@@ -138,7 +148,7 @@ export function finalizeModelOutput(
   }
 
   const { plan, ontology, erd } = toFrontend(validation.data);
-  const cleanErd = sanitizeERD(erd);
+  const cleanErd = describeTables(sanitizeERD(erd), plan);
   return {
     ok: true,
     body: {
@@ -238,13 +248,14 @@ export function detectProgress(text: string): { phase: GenerationPhase; tables: 
   const erdAt = text.search(/"erd"\s*:/);
   const relAt = erdAt >= 0 ? text.slice(erdAt).search(/"relationships"\s*:/) : -1;
   const phase: GenerationPhase =
-    relAt >= 0 ? "relationships" : erdAt >= 0 ? "erd" : /"ontology"\s*:/.test(text) ? "ontology" : "plan";
+    relAt >= 0 ? "relationships" : erdAt >= 0 ? "erd" : /"(ontology|entities)"\s*:/.test(text) ? "ontology" : "plan";
 
   const tables: string[] = [];
   if (erdAt >= 0) {
     const erdText = relAt >= 0 ? text.slice(erdAt, erdAt + relAt) : text.slice(erdAt);
-    // Table objects look like {"id": ..., "name": "orders", "object_type_id": ...}
-    const pattern = /"name"\s*:\s*"([A-Za-z0-9_]+)"\s*,\s*"object_type_id"/g;
+    // Table objects look like {"name": "orders", "description": ...}; columns
+    // ({"name": ..., "data_type": ...}) don't match.
+    const pattern = /"name"\s*:\s*"([A-Za-z0-9_]+)"\s*,\s*"(description|object_type_id|columns)"/g;
     for (const match of erdText.matchAll(pattern)) {
       if (!tables.includes(match[1])) tables.push(match[1]);
     }

@@ -261,3 +261,22 @@ export function lintErd(erd: ERD): Issue[] {
   const order: Record<Severity, number> = { error: 0, warning: 1, info: 2 };
   return issues.sort((a, b) => order[a.severity] - order[b.severity]);
 }
+
+/**
+ * Fixes safe to apply without asking: they never remove data or change
+ * meaning, only tighten types, add indexes and fill obvious gaps.
+ */
+const SAFE_FIX = /^(Add index|Use NUMERIC\(12,2\)|NOT NULL DEFAULT false|Make id the primary key|Change type to )/;
+
+/** Apply every safe fix (a couple of passes, since fixes can unlock others). */
+export function autoFixErd(erd: ERD, apply: (erd: ERD, ops: EditOp[]) => ERD): { erd: ERD; fixed: string[] } {
+  let current = erd;
+  const fixed: string[] = [];
+  for (let pass = 0; pass < 2; pass += 1) {
+    const safe = lintErd(current).filter((i) => i.fix && SAFE_FIX.test(i.fix.label));
+    if (safe.length === 0) break;
+    current = apply(current, safe.flatMap((i) => i.fix!.ops));
+    fixed.push(...safe.map((i) => i.fix!.label));
+  }
+  return { erd: current, fixed };
+}

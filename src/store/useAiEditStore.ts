@@ -8,6 +8,7 @@ import type { Issue } from "@/lib/verify/linter";
 import { checkFix, guardFixOps, problemText, type FixVerdict } from "@/lib/verify/fixCheck";
 import { useProjectStore } from "./useProjectStore";
 import { useSimulationStore } from "./useSimulationStore";
+import { useReviewStore } from "./useReviewStore";
 
 export interface EditDiff {
   addedTableIds: string[];
@@ -211,8 +212,9 @@ export const useAiEditStore = create<AiEditState>((set, get) => ({
   },
 
   accept: () => {
-    const { previewErd, previewPositions } = get();
+    const { previewErd, previewPositions, fixing } = get();
     if (!previewErd) return;
+    if (fixing?.id.startsWith("review:")) useReviewStore.getState().dismiss(fixing.id);
     const { positions, erd } = useErdStore.getState();
     if (!erd) useErdStore.getState().startBlank();
     useErdStore.getState().loadErd(previewErd, { ...positions, ...previewPositions });

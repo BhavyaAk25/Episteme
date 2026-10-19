@@ -169,6 +169,7 @@ export const TableSchema = z
     id: z.string().nullish(),
     name: z.string().min(1),
     object_type_id: z.string().nullish(),
+    description: z.string().nullish().transform((v) => v?.trim() || null),
     columns: list(ColumnSchema),
     constraints: list(TableConstraintSchema),
     indexes: list(TableIndexSchema),
@@ -289,6 +290,21 @@ export const ExplainAnswerSchema = z.object({
   notes: textList,
 });
 export type ExplainAnswer = z.output<typeof ExplainAnswerSchema>;
+
+const ReviewFinding = z.object({
+  severity: z.string().nullish().transform((v) => (v === "warning" ? ("warning" as const) : ("info" as const))),
+  table: z.string().nullish().transform((v) => (v && v !== "null" ? v : null)),
+  title: z.string().min(1),
+  detail: z.string().nullish().transform((v) => v ?? ""),
+  fix_request: z.string().nullish().transform((v) => v ?? ""),
+});
+export const ReviewAnswerSchema = z.object({
+  findings: z
+    .array(ReviewFinding.nullable().catch(null))
+    .nullish()
+    .transform((items) => (items ?? []).filter((f): f is z.output<typeof ReviewFinding> => f !== null).slice(0, 6)),
+});
+export type ReviewAnswer = z.output<typeof ReviewAnswerSchema>;
 
 export const EditResponseSchema = z.object({
   summary: z.string().nullish().transform((v) => v ?? ""),

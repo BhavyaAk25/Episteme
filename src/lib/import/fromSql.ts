@@ -55,6 +55,11 @@ export function adaptDialect(sql: string): string {
     .replace(/\bINT\s*\(\d+\)/gi, "INTEGER")
     .replace(/\b(INTEGER|INT|BIGINT)\b([^,\n]*?)\bAUTO_INCREMENT\b/gi, (_, type: string, rest: string) => `${/BIG/i.test(type) ? "BIGSERIAL" : "SERIAL"}${rest}`)
     .replace(/\)\s*ENGINE\s*=\s*\w+[^;]*;/gi, ");")
+    // SQLite: INTEGER PRIMARY KEY AUTOINCREMENT, WITHOUT ROWID / STRICT tables, PRAGMAs.
+    .replace(/\bINTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b/gi, "SERIAL PRIMARY KEY")
+    .replace(/\)\s*(WITHOUT\s+ROWID|STRICT)(\s*,\s*(WITHOUT\s+ROWID|STRICT))?\s*;/gi, ");")
+    .replace(/^\s*(PRAGMA|BEGIN TRANSACTION|COMMIT)\b[^;]*;/gim, "")
+    .replace(/^\s*CREATE TABLE sqlite_sequence\([^;]*\);/gim, "")
     .replace(/\bDATETIME\b/gi, "TIMESTAMP")
     .replace(/\bTINYINT\s*\(\s*1\s*\)([^,\n]*?)DEFAULT\s+'?([01])'?/gi, (_, rest: string, bit: string) => `BOOLEAN${rest}DEFAULT ${bit === "1" ? "true" : "false"}`)
     .replace(/\bTINYINT\s*\(\s*1\s*\)/gi, "BOOLEAN")

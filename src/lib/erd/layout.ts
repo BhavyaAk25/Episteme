@@ -42,6 +42,8 @@ export async function layoutErd(
       // Network simplex gives the straightest lines but grows steeply with
       // size (~7s at 100 tables); SIMPLE stays compact and takes ~0.25s.
       "elk.layered.nodePlacement.strategy": erd.tables.length > LARGE_SCHEMA ? "SIMPLE" : "NETWORK_SIMPLEX",
+      // Deep chains of tables wrap into rows instead of one long strip.
+      ...(erd.tables.length > LARGE_SCHEMA ? { "elk.layered.wrapping.strategy": "MULTI_EDGE", "elk.aspectRatio": "1.6" } : {}),
       "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
       "elk.edgeRouting": "ORTHOGONAL",
     },

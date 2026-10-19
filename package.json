@@ -37,6 +37,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "node-sql-parser": "^5.4.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^3.2.7"

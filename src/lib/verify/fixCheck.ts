@@ -73,6 +73,11 @@ export async function checkFix(issue: Issue, before: ERD, after: ERD, prompt: st
     return { resolved: true, message: "Re-tested in Postgres: this fixes it." };
   }
 
+  // Design-review findings come from the AI; there's no rule to re-check.
+  if (issue.id.startsWith("review:")) {
+    return { resolved: true, message: "Applies cleanly with no new problems. Design suggestions can't be verified automatically: review the change." };
+  }
+
   const remaining = [...lintErd(after), ...promptCoverage(prompt, after)];
   if (remaining.some((i) => i.id === issue.id)) return { resolved: false, message: "Checked: the problem is still there." };
   return { resolved: true, message: "Checked: this fixes it." };

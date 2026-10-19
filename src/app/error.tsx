@@ -1,5 +1,7 @@
 "use client";
 
+import { FEEDBACK_URL } from "@/lib/feedback";
+
 import { useEffect } from "react";
 import { reportError } from "@/lib/utils/reportError";
 
@@ -17,6 +19,9 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
           <button onClick={reset} className="ui-primary-btn">Try again</button>
           <button onClick={() => window.location.reload()} className="ui-ghost-btn">Reload page</button>
         </div>
+        <p className="mt-4 text-[12px] text-muted">
+          Keeps happening? <a href={FEEDBACK_URL} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">Tell us what you were doing</a>.
+        </p>
       </div>
     </div>
   );

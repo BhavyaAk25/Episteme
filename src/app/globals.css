@@ -361,3 +361,9 @@ nextjs-portal,
   :root:not([data-theme="light"]) .logo-light { display: none; }
   :root:not([data-theme="light"]) .logo-dark { display: block; }
 }
+
+/* Focus mode on big schemas fades unrelated tables smoothly. */
+.erd-focus .react-flow__node,
+.erd-focus .react-flow__edge {
+  transition: opacity 160ms ease;
+}

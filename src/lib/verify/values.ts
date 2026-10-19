@@ -65,6 +65,39 @@ function numberInRange(table: Table, column: Column, preferred: number): number 
   return value;
 }
 
+const LATER_NAME = /(^|_)(end|ends|ended|finish|finished|until|due|expires?|expired|expiry|closed?|returned|check_?out|completed|to)(_|$)/;
+
+/**
+ * How many steps "later" a column must be than others in the same row, from
+ * CHECKs like `end_time > start_time` (or `start < end`) and from names such
+ * as ends_at / due_date. Used to space out timestamps, dates and numbers so
+ * seed rows satisfy ordering rules.
+ */
+function orderRank(table: Table, column: Column): number {
+  const names = new Set(table.columns.map((c) => c.name));
+  const after = new Map<string, Set<string>>(); // column -> columns it must exceed
+  const link = (big: string, small: string) => {
+    if (!names.has(big) || !names.has(small) || big === small) return;
+    if (!after.has(big)) after.set(big, new Set());
+    after.get(big)!.add(small);
+  };
+  for (const constraint of table.constraints) {
+    if (constraint.type !== "CHECK" || !constraint.expression) continue;
+    for (const m of constraint.expression.matchAll(/\b([a-z_][a-z0-9_]*)\s*(>=|<=|>|<)\s*([a-z_][a-z0-9_]*)\b/gi)) {
+      if (m[2].startsWith(">")) link(m[1], m[3]);
+      else link(m[3], m[1]);
+    }
+  }
+  const rank = (name: string, seen: Set<string>): number => {
+    if (seen.has(name)) return 0;
+    seen.add(name);
+    const lower = [...(after.get(name) ?? [])];
+    return lower.length ? 1 + Math.max(...lower.map((l) => rank(l, new Set(seen)))) : 0;
+  };
+  const fromChecks = rank(column.name, new Set());
+  return fromChecks || (LATER_NAME.test(column.name.toLowerCase()) ? 1 : 0);
+}
+
 /**
  * A valid literal for `column` in row number `row` (0-based). Pass the
  * values of the column's enum type when it has one.
@@ -81,8 +114,9 @@ export function validLiteral(table: Table, column: Column, row: number, enumValu
   if (/BOOL/.test(type)) return row % 2 === 0 ? "true" : "false";
   if (/UUID/.test(type)) return "gen_random_uuid()";
   if (/JSON/.test(type)) return `'{"seed": ${row + 1}}'`;
-  if (/TIMESTAMP|DATETIME/.test(type)) return `now() - interval '${row * 3 + 1} days'`;
-  if (/^DATE/.test(type)) return `current_date - ${row * 3 + 1}`;
+  const later = orderRank(table, column);
+  if (/TIMESTAMP|DATETIME/.test(type)) return `now() - interval '${row * 3 + 1} days'${later ? ` + interval '${later} hours'` : ""}`;
+  if (/^DATE/.test(type)) return `current_date - ${row * 3 + 1}${later ? ` + ${later}` : ""}`;
   if (/^TIME/.test(type)) return quote(`${String(9 + (row % 8)).padStart(2, "0")}:30:00`);
   if (/INTERVAL/.test(type)) return `interval '${row + 1} hours'`;
   if (/BYTEA/.test(type)) return `'\\x00${row.toString(16).padStart(2, "0")}'`;
@@ -95,11 +129,11 @@ export function validLiteral(table: Table, column: Column, row: number, enumValu
         : /year/.test(name)
           ? 2020 + (row % 6)
           : row + 1;
-    return String(Math.round(numberInRange(table, column, preferred)));
+    return String(Math.round(numberInRange(table, column, preferred + later * 10)));
   }
   if (/NUMERIC|DECIMAL|REAL|FLOAT|DOUBLE|MONEY/.test(type)) {
     const preferred = /price|amount|cost|total|fee|balance|salary/.test(name) ? 19.99 + row * 10 : 1.5 + row;
-    return String(numberInRange(table, column, Math.round(preferred * 100) / 100));
+    return String(numberInRange(table, column, Math.round((preferred + later * 10) * 100) / 100));
   }
 
   // Text-like
