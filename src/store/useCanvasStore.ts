@@ -13,6 +13,9 @@ interface CanvasState {
   nodes: ERDNode[];
   selectedNodeId: string | null;
   selectedEdgeId: string | null;
+  /** Relationship under the pointer, to explain it in plain English. */
+  hoveredEdgeId: string | null;
+  setHoveredEdge: (edgeId: string | null) => void;
   viewport: Viewport;
   /** Bumped when the whole diagram should be re-fitted (new schema, tidy up). */
   fitRequest: number;
@@ -33,6 +36,7 @@ const initialState = {
   nodes: [] as ERDNode[],
   selectedNodeId: null,
   selectedEdgeId: null,
+  hoveredEdgeId: null as string | null,
   viewport: { x: 0, y: 0, zoom: 1 },
   fitRequest: 0,
   focusRequest: null as { nodeId: string; seq: number } | null,
@@ -42,6 +46,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   ...initialState,
 
   onNodesChange: (changes) => set({ nodes: applyNodeChanges(changes, get().nodes) }),
+  setHoveredEdge: (hoveredEdgeId) => set({ hoveredEdgeId }),
   setNodes: (nodes) => set({ nodes }),
   selectNode: (nodeId) => set({ selectedNodeId: nodeId, selectedEdgeId: null }),
   selectEdge: (edgeId) => set({ selectedEdgeId: edgeId, selectedNodeId: null }),

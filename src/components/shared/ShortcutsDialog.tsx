@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useUIStore } from "@/store/useUIStore";
+import { useCanvasStore } from "@/store/useCanvasStore";
 import { FEEDBACK_URL } from "@/lib/feedback";
 
 const isTyping = (target: EventTarget | null) =>
@@ -22,6 +23,8 @@ const SHORTCUTS: Array<[string, string]> = [
   [`${mod} + C / V`, "Copy / paste tables"],
   [`${mod} + D`, "Duplicate selected tables"],
   ["Double-click a name", "Rename a table or column"],
+  ["N", "New table"],
+  ["F", "Fit the diagram to the screen"],
   ["Esc", "Close dialogs and menus"],
   ["?", "Show this list"],
 ];
@@ -44,6 +47,15 @@ export function ShortcutsDialog() {
       } else if (event.key === "/") {
         event.preventDefault();
         document.querySelector<HTMLInputElement>('input[aria-label="System description"]')?.focus();
+      } else if (event.key === "n" || event.key === "N") {
+        const add = document.querySelector<HTMLButtonElement>('button[aria-label="Add table"]');
+        if (add && !add.disabled) {
+          event.preventDefault();
+          add.click();
+        }
+      } else if (event.key === "f" || event.key === "F") {
+        event.preventDefault();
+        useCanvasStore.getState().requestFit();
       }
     };
     window.addEventListener("keydown", onKeyDown);
