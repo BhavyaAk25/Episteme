@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSimulationStore } from "@/store/useSimulationStore";
 import { useUIStore, type VerifyTab as Tab } from "@/store/useUIStore";
@@ -129,7 +129,40 @@ function ReviewStatus() {
 export function VerifyPanel() {
   const hasTables = useErdStore((state) => (state.erd?.tables.length ?? 0) > 0);
   const { run, isRunning, progress, error, runTests } = useSimulationStore();
-  const { drawerOpen, toggleDrawer, drawerHeight } = useUIStore();
+  const { drawerOpen, toggleDrawer, drawerHeight, setDrawerHeight } = useUIStore();
+  const [viewportHeight, setViewportHeight] = useState(800);
+  const [dragging, setDragging] = useState(false);
+  useEffect(() => {
+    const update = () => setViewportHeight(window.innerHeight);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+  // Never take more than ~45% of the screen, so the diagram stays usable.
+  const maxPanel = Math.max(200, Math.round(viewportHeight * 0.45));
+  const panelHeight = Math.min(drawerHeight + 40, maxPanel);
+  const startResize = (event: React.PointerEvent) => {
+    event.preventDefault();
+    const startY = event.clientY;
+    const startHeight = panelHeight;
+    setDragging(true);
+    const onMove = (e: PointerEvent) => {
+      const next = Math.min(Math.round(window.innerHeight * 0.75), Math.max(160, startHeight + (startY - e.clientY)));
+      setDrawerHeight(next - 40);
+    };
+    const onUp = () => {
+      setDragging(false);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      try {
+        localStorage.setItem("episteme-drawer-height", String(useUIStore.getState().drawerHeight));
+      } catch {
+        /* storage unavailable */
+      }
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
   const issues = useIssues();
   const tab = useUIStore((s) => s.verifyTab);
   const setTab = useUIStore((s) => s.setVerifyTab);
@@ -153,7 +186,18 @@ export function VerifyPanel() {
   if (!hasTables) return null;
 
   return (
-    <div className="shrink-0">
+    <div className="shrink-0 relative">
+      {drawerOpen && (
+        <div
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Drag to resize the checks panel"
+          onPointerDown={startResize}
+          className="absolute -top-1.5 inset-x-0 h-3 z-10 cursor-row-resize group"
+        >
+          <span className="block mx-auto mt-1 h-1 w-10 rounded-full bg-border opacity-0 group-hover:opacity-100 transition-opacity" />
+        </div>
+      )}
       <div className="h-10 bg-surface/95 border-t border-border px-4 flex items-center gap-4">
         <button
           onClick={toggleDrawer}
@@ -187,9 +231,9 @@ export function VerifyPanel() {
         {drawerOpen && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
-            animate={{ height: drawerHeight + 40, opacity: 1 }}
+            animate={{ height: panelHeight, opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            transition={dragging ? { duration: 0 } : { type: "spring", damping: 25, stiffness: 300 }}
             className="bg-surface border-t border-border overflow-hidden shadow-[0_-10px_24px_rgba(86,61,38,0.10)]"
           >
             <div className="h-full flex flex-col">

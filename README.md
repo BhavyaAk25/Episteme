@@ -115,7 +115,8 @@ npm run dev        # development server
 npm run build      # production build
 npm run lint       # eslint
 npm run typecheck  # tsc --noEmit
-npm test           # vitest
+npm test           # unit tests (vitest)
+npm run test:e2e   # end-to-end tests in Chromium (npx playwright install chromium once)
 ```
 
 ### Deploy

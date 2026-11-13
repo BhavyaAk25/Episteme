@@ -118,7 +118,12 @@ export function lintErd(erd: ERD): Issue[] {
       }
 
       // Natural keys should be unique
-      if (NATURAL_KEY.test(column.name) && !column.isPrimaryKey && !column.isForeignKey && !isColumnUnique(table, column.name)) {
+      // Unique within a parent (e.g. UNIQUE (organization_id, email)) counts too.
+      const uniqueInScope = [
+        ...table.constraints.filter((c) => c.type === "UNIQUE").map((c) => c.columns),
+        ...table.indexes.filter((i) => i.unique).map((i) => i.columns),
+      ].some((cols) => cols.includes(column.name));
+      if (NATURAL_KEY.test(column.name) && !column.isPrimaryKey && !column.isForeignKey && !uniqueInScope) {
         add({
           severity: "warning",
           table: table.name,

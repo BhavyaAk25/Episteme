@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { useReactFlow, type FitViewOptions } from "@xyflow/react";
+import { useNodesInitialized, useReactFlow, type FitViewOptions } from "@xyflow/react";
 import { useCanvasStore } from "@/store/useCanvasStore";
 import { useUIStore } from "@/store/useUIStore";
 
@@ -25,8 +25,21 @@ export function CanvasAutoFit() {
   const focusRequest = useCanvasStore((state) => state.focusRequest);
   const sidebarOpen = useUIStore((state) => state.sidebarOpen);
   const drawerOpen = useUIStore((state) => state.drawerOpen);
+  const inspectorOpen = useUIStore((state) => state.inspectorOpen);
   const fitOptions = useMemo(() => ({ ...CANVAS_FIT_OPTIONS, duration: 300 }), []);
   const isFirstPanelRun = useRef(true);
+  const nodesInitialized = useNodesInitialized();
+  const fittedOnLoad = useRef(false);
+
+  // After a page load, fit once the restored tables have been measured.
+  useEffect(() => {
+    if (!nodesInitialized || fittedOnLoad.current) return;
+    const timer = window.setTimeout(() => {
+      fittedOnLoad.current = true;
+      void fitView(fitOptions);
+    }, MEASURE_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [nodesInitialized, fitView, fitOptions]);
 
   // Wait a moment so newly rendered nodes are measured before fitting.
   useEffect(() => {
@@ -46,9 +59,15 @@ export function CanvasAutoFit() {
       isFirstPanelRun.current = false;
       return;
     }
-    const timer = window.setTimeout(() => void fitView(fitOptions), PANEL_ANIMATION_MS);
+    const timer = window.setTimeout(() => {
+      // Keep the table being inspected in view; otherwise fit everything.
+      const selected = useCanvasStore.getState().selectedNodeId;
+      void (selected && inspectorOpen
+        ? fitView({ nodes: [{ id: selected }], maxZoom: 1, padding: 0.6, duration: 300 })
+        : fitView(fitOptions));
+    }, PANEL_ANIMATION_MS);
     return () => window.clearTimeout(timer);
-  }, [sidebarOpen, drawerOpen, fitView, fitOptions]);
+  }, [sidebarOpen, drawerOpen, inspectorOpen, fitView, fitOptions]);
 
   return null;
 }

@@ -367,3 +367,13 @@ nextjs-portal,
 .erd-focus .react-flow__edge {
   transition: opacity 160ms ease;
 }
+
+/* Horizontal strips that scroll without a visible scrollbar (touch/trackpad). */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Thin, theme-coloured scrollbars for panels and lists. */
+* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-track { background: transparent; }

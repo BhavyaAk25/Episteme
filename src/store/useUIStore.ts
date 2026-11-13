@@ -15,6 +15,15 @@ function readDetail(): NodeDetail {
   }
 }
 
+function readDrawerHeight(): number {
+  try {
+    const saved = typeof window !== "undefined" ? Number(window.localStorage.getItem("episteme-drawer-height")) : NaN;
+    return Number.isFinite(saved) && saved >= 120 && saved <= 1200 ? saved : 250;
+  } catch {
+    return 250;
+  }
+}
+
 interface UIState {
   // Sidebar
   sidebarOpen: boolean;
@@ -22,6 +31,8 @@ interface UIState {
 
   // Inspector panel
   inspectorOpen: boolean;
+  /** The sidebar was hidden only to make room for the inspector. */
+  sidebarAutoClosed: boolean;
   inspectorWidth: number;
 
   // Bottom drawer
@@ -91,6 +102,7 @@ const initialState = {
   inspectorOpen: false,
   inspectorWidth: 380,
   drawerOpen: false,
+  sidebarAutoClosed: false,
   verifyTab: "issues" as VerifyTab,
   objectEditor: null,
   explainOpen: false,
@@ -101,22 +113,30 @@ const initialState = {
   paletteOpen: false,
   tourOpen: false,
   nodeDetail: "full" as NodeDetail,
-  drawerHeight: 250,
+  drawerHeight: readDrawerHeight(),
   playbackSpeed: 1 as PlaybackSpeed,
   exportModalOpen: false,
   errorModalOpen: false,
   errorModalContent: null,
 };
 
-export const useUIStore = create<UIState>((set) => ({
+export const useUIStore = create<UIState>((set, get) => ({
   ...initialState,
 
-  toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+  toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen, sidebarAutoClosed: false })),
   setSidebarWidth: (width) => set({ sidebarWidth: width }),
 
-  toggleInspector: () => set((state) => ({ inspectorOpen: !state.inspectorOpen })),
-  openInspector: () => set({ inspectorOpen: true }),
-  closeInspector: () => set({ inspectorOpen: false }),
+  toggleInspector: () => (get().inspectorOpen ? get().closeInspector() : get().openInspector()),
+  // Below 1280px the canvas can't fit the sidebar and inspector side by side:
+  // tuck the sidebar away while inspecting and bring it back afterwards.
+  openInspector: () => {
+    const { inspectorOpen, sidebarOpen } = get();
+    if (inspectorOpen) return;
+    const cramped = typeof window !== "undefined" && window.innerWidth >= 768 && window.innerWidth < 1280;
+    set({ inspectorOpen: true, ...(cramped && sidebarOpen ? { sidebarOpen: false, sidebarAutoClosed: true } : {}) });
+  },
+  closeInspector: () =>
+    set((state) => ({ inspectorOpen: false, ...(state.sidebarAutoClosed ? { sidebarOpen: true, sidebarAutoClosed: false } : {}) })),
   setInspectorWidth: (width) => set({ inspectorWidth: width }),
 
   toggleDrawer: () => set((state) => ({ drawerOpen: !state.drawerOpen })),

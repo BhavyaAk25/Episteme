@@ -51,13 +51,13 @@ export function ProjectSwitcher() {
   const sorted = [...projects].sort((a, b) => b.updatedAt - a.updatedAt);
 
   return (
-    <div className="relative shrink-0" ref={menuRef}>
+    <div className="relative min-w-0 max-sm:shrink" ref={menuRef}>
       <button
         onClick={() => setOpen(!open)}
         disabled={isGenerating}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="h-9 max-w-[220px] px-3 rounded-lg border border-border bg-canvas hover:bg-elevated flex items-center gap-2 text-[13px] font-medium text-foreground disabled:opacity-50"
+        className="h-9 max-w-[min(220px,100%)] min-w-0 px-3 rounded-lg border border-border bg-canvas hover:bg-elevated flex items-center gap-2 text-[13px] font-medium text-foreground disabled:opacity-50"
         title="Switch project"
       >
         <span className="truncate">{current.name}</span>

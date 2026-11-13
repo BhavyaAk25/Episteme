@@ -4,6 +4,8 @@ import { useProjectsStore } from "@/store/useProjectsStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
 import { importErd } from "@/lib/erd/model";
 import { layoutErd } from "@/lib/erd/layout";
+import { applyOps } from "@/lib/erd/applyOps";
+import { autoFixErd } from "@/lib/verify/linter";
 
 export type TemplateId = "inventory" | "saas" | "ecommerce";
 
@@ -37,7 +39,8 @@ export async function loadTemplate(id: TemplateId, options: { newProject?: boole
   if (!template) return;
   const { createFallbackGeneration } = await import("@/lib/gemini/fallbackGeneration");
   const generated = createFallbackGeneration(template.prompt, { templateId: id, geminiAttempted: false });
-  const erd = importErd(generated.erd);
+  // Templates should pass our own checks: apply the safe design fixes.
+  const { erd } = autoFixErd(importErd(generated.erd), (base, ops) => applyOps(base, ops).erd);
   const positions = await layoutErd(erd).catch(() => ({}));
 
   const current = useErdStore.getState().erd;

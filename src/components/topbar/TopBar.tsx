@@ -73,90 +73,104 @@ export function TopBar() {
 
 
   return (
-    <header className="relative z-40 bg-surface/94 backdrop-blur border-b border-border px-4 md:px-6 pt-[calc(env(safe-area-inset-top,0px)+12px)] shadow-[0_6px_18px_rgba(86,61,38,0.08)]">
-      <div className="min-h-[72px] py-2 flex items-center">
-        <div className="flex flex-wrap xl:flex-nowrap items-center gap-x-4 gap-y-2 w-full min-w-0">
-          <div className="flex items-center gap-2.5 shrink-0">
-            <div className="w-10 h-10 flex items-center justify-center">
-              <Image src="/brand/episteme-mark.svg" alt="Episteme" width={40} height={40} className="logo-light w-10 h-10 object-contain" priority />
-              <Image src="/brand/episteme-mark-dark.svg" alt="" aria-hidden="true" width={40} height={40} className="logo-dark w-10 h-10 object-contain" />
-            </div>
-            <span className="font-display text-[1.6rem] leading-none tracking-tight text-foreground hidden lg:block">
-              Episteme
-            </span>
+    <header className="relative z-40 bg-surface/94 backdrop-blur border-b border-border px-3 sm:px-4 md:px-6 pt-[env(safe-area-inset-top,0px)] shadow-[0_6px_18px_rgba(0,0,0,0.08)]">
+      <div className="py-2.5 flex flex-wrap xl:flex-nowrap items-center gap-x-3 gap-y-2.5">
+        {/* Row 1: brand, project and actions. */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className="w-9 h-9 flex items-center justify-center">
+            <Image src="/brand/episteme-mark.svg" alt="Episteme" width={36} height={36} className="logo-light w-9 h-9 object-contain" priority />
+            <Image src="/brand/episteme-mark-dark.svg" alt="" aria-hidden="true" width={36} height={36} className="logo-dark w-9 h-9 object-contain" />
           </div>
+          <span className="font-display text-[1.5rem] leading-none tracking-tight text-foreground hidden lg:block">Episteme</span>
+        </div>
+        <div className="min-w-0 max-sm:flex-1 flex items-center gap-3">
           <ProjectSwitcher />
           <SaveIndicator />
+        </div>
 
-          {/* On narrow screens the description gets its own full-width row. */}
-          <div className="order-last basis-full xl:order-none xl:basis-auto xl:flex-1 min-w-0">
-            <input
-              type="text"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value, null)}
-              maxLength={MAX_PROMPT_LENGTH}
-              aria-label="System description"
-              onKeyDown={(e) => e.key === "Enter" && handleGenerate()}
-              placeholder="Describe your system... (e.g., 'inventory management for sneaker brand')"
-              className="w-full min-w-0 h-11 px-4 rounded-xl bg-canvas border border-border text-foreground text-[0.95rem] placeholder:text-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-colors"
-              disabled={isGenerating}
-            />
-          </div>
-
+        {/* Row 2 below xl: the description with Generate attached. */}
+        <form
+          className="order-last basis-full xl:order-none xl:basis-auto xl:flex-1 min-w-0 flex items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleGenerate();
+          }}
+        >
+          <input
+            type="text"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value, null)}
+            maxLength={MAX_PROMPT_LENGTH}
+            aria-label="System description"
+            placeholder="Describe your system… e.g. “inventory management for a sneaker brand”"
+            className="flex-1 w-full min-w-0 h-10 px-4 rounded-xl bg-canvas border border-border text-foreground text-[0.95rem] placeholder:text-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-colors"
+            disabled={isGenerating}
+          />
           <button
-            onClick={handleGenerate}
-            title="Generate (⌘/Ctrl + Enter)"
+            type="submit"
+            title="Generate (Enter)"
             disabled={!prompt.trim() || isGenerating}
-            className="ui-primary-btn disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5 shrink-0"
+            className="ui-primary-btn !min-h-10 !px-4 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5 shrink-0"
           >
             {isGenerating ? (
               <>
                 <span className="w-3.5 h-3.5 border-2 border-brand-ink/30 border-t-brand-ink rounded-full animate-spin" />
-                Generating...
+                <span className="max-sm:hidden">Generating…</span>
               </>
             ) : (
               "Generate"
             )}
           </button>
+        </form>
 
-          <div className="flex items-center gap-2 lg:gap-3 shrink-0 ml-auto xl:ml-0">
-            <button
-              onClick={handleRunTests}
-              data-tour="run-tests"
-              title="Run the schema in real Postgres and test every rule"
-              disabled={!erd || isSimulating || isGenerating}
-              className="ui-ghost-btn disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isSimulating ? "Testing…" : "Run tests"}
-            </button>
-            <button
-              onClick={() => useUIStore.getState().openDrawer()}
-              disabled={!erd}
-              title="Design issues and test results"
-              className="ui-ghost-btn disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
-            >
-              Issues
-              {erd && (
-                <span
-                  className={`min-w-5 h-5 px-1.5 rounded-full text-[11px] font-semibold inline-flex items-center justify-center ${
-                    problemCount ? "bg-warning/15 text-warning" : "bg-success/15 text-success"
-                  }`}
-                >
-                  {problemCount}
-                </span>
-              )}
-            </button>
-            <ThemeToggle />
-            <button
-              onClick={handleExport}
-              data-tour="export"
-              title="Export"
-              disabled={!erd}
-              className="ui-ghost-btn disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Export
-            </button>
-          </div>
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto xl:ml-0">
+          <button
+            onClick={handleRunTests}
+            data-tour="run-tests"
+            title="Run the schema in real Postgres and test every rule"
+            aria-label="Run tests"
+            disabled={!erd || isSimulating || isGenerating}
+            className="ui-ghost-btn max-sm:!px-2.5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-1.5"
+          >
+            <svg className="w-4 h-4 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3h6M10 3v6l-5 9a2 2 0 001.8 3h10.4a2 2 0 001.8-3l-5-9V3" />
+            </svg>
+            <span className="max-sm:hidden">{isSimulating ? "Testing…" : "Run tests"}</span>
+          </button>
+          <button
+            onClick={() => useUIStore.getState().showVerifyTab("issues")}
+            disabled={!erd}
+            title="Design issues and test results"
+            aria-label={`Issues${erd ? ` (${problemCount})` : ""}`}
+            className="ui-ghost-btn max-sm:!px-2.5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+          >
+            <span className="max-sm:hidden">Issues</span>
+            {erd ? (
+              <span
+                className={`min-w-5 h-5 px-1.5 rounded-full text-[11px] font-semibold inline-flex items-center justify-center ${
+                  problemCount ? "bg-warning/15 text-warning" : "bg-success/15 text-success"
+                }`}
+              >
+                {problemCount}
+              </span>
+            ) : (
+              <span className="sm:hidden">!</span>
+            )}
+          </button>
+          <ThemeToggle />
+          <button
+            onClick={handleExport}
+            data-tour="export"
+            title="Export"
+            aria-label="Export"
+            disabled={!erd}
+            className="ui-ghost-btn max-sm:!px-2.5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-1.5"
+          >
+            <svg className="w-4 h-4 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14" />
+            </svg>
+            <span className="max-sm:hidden">Export</span>
+          </button>
         </div>
       </div>
 
