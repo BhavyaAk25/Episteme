@@ -265,6 +265,8 @@ export function ERDCanvas() {
         onNodesChange={onNodesChange}
         onNodeClick={onNodeClick}
         onEdgeClick={onEdgeClick}
+        onEdgeMouseEnter={(_, edge) => useCanvasStore.getState().setHoveredEdge(edge.id)}
+        onEdgeMouseLeave={() => useCanvasStore.getState().setHoveredEdge(null)}
         onPaneClick={onPaneClick}
         onNodeDragStop={onNodeDragStop}
         onConnect={onConnect}

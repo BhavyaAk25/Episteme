@@ -108,3 +108,38 @@ test.describe("start and edit", () => {
     await expect(other.locator(".react-flow__node")).toHaveCount(count);
   });
 });
+
+test.describe("canvas interactions", () => {
+  test("hovering a relationship explains it in plain English", async ({ page }) => {
+    await openApp(page);
+    await loadTemplate(page, "E-commerce");
+    await page.waitForTimeout(800);
+    const edge = page.locator('.react-flow__edge[data-id="rel_order_customer"] path').first();
+    const point = await edge.evaluate((p: SVGPathElement) => {
+      const pt = p.getPointAtLength(p.getTotalLength() / 2);
+      const m = p.getScreenCTM()!;
+      return { x: pt.x * m.a + m.e, y: pt.y * m.d + m.f };
+    });
+    await page.mouse.move(point.x, point.y);
+    await expect(page.getByText(/Each order has one customer/)).toBeVisible();
+  });
+
+  test("a column can be added straight from the selected table", async ({ page }) => {
+    await openApp(page);
+    await loadTemplate(page, "E-commerce");
+    await page.locator(".react-flow__node", { hasText: "orders" }).first().click();
+    await page.getByRole("button", { name: "Add a column to orders" }).click();
+    await page.keyboard.type("notes");
+    await page.keyboard.press("Enter");
+    await expect(page.locator(".react-flow__node", { hasText: "notes" })).toBeVisible();
+  });
+
+  test("N adds a table and F fits the diagram", async ({ page }) => {
+    await openApp(page);
+    await loadTemplate(page, "SaaS billing");
+    const before = await page.locator(".react-flow__node").count();
+    await page.locator(".react-flow__pane").click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press("n");
+    await expect(page.locator(".react-flow__node")).toHaveCount(before + 1);
+  });
+});

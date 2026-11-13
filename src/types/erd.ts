@@ -104,4 +104,6 @@ export interface ERDEdgeData extends Record<string, unknown> {
   onDelete: OnDeleteAction;
   fromColumn: string;
   toColumn: string;
+  fromTable?: string;
+  toTable?: string;
 }

@@ -266,6 +266,8 @@ export function erdToEdges(
         onDelete: rel.onDelete,
         fromColumn: rel.fromColumn,
         toColumn: rel.toColumn,
+        fromTable: rel.fromTable,
+        toTable: rel.toTable,
       },
     }];
   });

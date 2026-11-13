@@ -83,7 +83,7 @@ function ERDTableNodeComponent({ id, data, selected, draggable }: NodeProps) {
 
   return (
     <div
-      className={`erd-node relative bg-node rounded-[10px] min-w-[280px] border-[1.5px] transition-shadow ${
+      className={`erd-node group/node relative bg-node rounded-[10px] min-w-[280px] border-[1.5px] transition-shadow ${
         nodeData.diff === "added"
           ? "border-success shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent-green)_22%,transparent)]"
           : nodeData.diff === "changed"
@@ -180,6 +180,21 @@ function ERDTableNodeComponent({ id, data, selected, draggable }: NodeProps) {
             <Handle type="source" position={Position.Right} id={columnHandleId(col.name, "R")} className={handleClass} />
           </div>
         ))}
+        {editable && selected && detail === "full" && (
+          <button
+            type="button"
+            className="nodrag w-full px-3.5 py-1 flex items-center gap-2 text-left text-[11px] text-muted hover:text-accent"
+            onClick={(e) => {
+              e.stopPropagation();
+              const name = useErdStore.getState().addColumn(id);
+              if (name) setEditing({ kind: "column", name });
+            }}
+            aria-label={`Add a column to ${nodeData.tableName}`}
+          >
+            <span className="w-4 text-center">+</span>
+            column
+          </button>
+        )}
       </div>
 
       {hiddenCount > 0 && detail !== "names" && (
