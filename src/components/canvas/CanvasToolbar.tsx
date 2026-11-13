@@ -31,7 +31,7 @@ function ToolButton({
       disabled={disabled}
       title={title}
       aria-label={title}
-      className="h-8 px-2.5 rounded-md flex items-center gap-1.5 text-[12px] font-medium text-foreground hover:bg-foreground/[0.05] disabled:opacity-35 disabled:hover:bg-transparent transition-colors"
+      className="h-8 px-2.5 shrink-0 whitespace-nowrap rounded-md flex items-center gap-1.5 text-[12px] font-medium text-foreground hover:bg-foreground/[0.05] disabled:opacity-35 disabled:hover:bg-transparent transition-colors"
     >
       {children}
     </button>
@@ -80,7 +80,7 @@ function DetailToggle() {
     { value: "names", label: "Names", title: "Show only table names" },
   ];
   return (
-    <div className="flex items-center rounded-md bg-foreground/[0.04] p-0.5" role="radiogroup" aria-label="Column detail">
+    <div className="flex shrink-0 items-center rounded-md bg-foreground/[0.04] p-0.5" role="radiogroup" aria-label="Column detail">
       {options.map((option) => (
         <button
           key={option.value}
@@ -142,7 +142,10 @@ export function CanvasToolbar({ disabled }: { disabled: boolean }) {
 
   return (
     <Panel position="top-left" className="!m-3">
-      <div data-tour="toolbar" className="flex flex-wrap items-center gap-0.5 rounded-lg border border-border bg-surface/95 backdrop-blur px-1 py-1 shadow-sm max-w-[calc(100vw-40px)]">
+      <div
+        data-tour="toolbar"
+        className="flex flex-wrap @max-[700px]:flex-nowrap @max-[700px]:overflow-x-auto no-scrollbar items-center gap-0.5 rounded-lg border border-border bg-surface/95 backdrop-blur px-1 py-1 shadow-sm max-w-[calc(100cqw-24px)]"
+      >
         <ToolButton onClick={handleAddTable} disabled={disabled} title="Add table">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeWidth={2} d="M12 5v14M5 12h14" />

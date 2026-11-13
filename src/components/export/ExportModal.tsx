@@ -24,9 +24,52 @@ const FORMATS: Array<{ key: FormatKey; file: string; label: string; hint: string
   { key: "sqlite", file: "schema.sqlite.sql", label: "SQLite", hint: "With foreign keys on" },
   { key: "prisma", file: "schema.prisma", label: "Prisma", hint: "Models, relations, @@map" },
   { key: "drizzle", file: "schema.drizzle.ts", label: "Drizzle ORM", hint: "pg-core tables" },
-  { key: "ontology", file: "ontology.json", label: "Ontology JSON", hint: "Objects, links, actions" },
+  { key: "ontology", file: "schema.json", label: "Schema JSON", hint: "Tables, links and descriptions" },
   { key: "report", file: "report.html", label: "Checks report", hint: "Issues + Postgres test results" },
 ];
+
+const PREVIEWABLE: FormatKey[] = ["postgres", "mysql", "sqlite", "prisma", "drizzle"];
+
+/** Read the generated code right here, and copy it, without downloading. */
+function CodePreview({ files }: { files: Record<FormatKey, () => string> }) {
+  const [format, setFormat] = useState<FormatKey>("postgres");
+  const [copied, setCopied] = useState(false);
+  const code = useMemo(() => files[format](), [files, format]);
+  return (
+    <section>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <h3 className="ui-section-title">Preview</h3>
+        <button
+          onClick={() =>
+            void navigator.clipboard.writeText(code).then(() => {
+              setCopied(true);
+              window.setTimeout(() => setCopied(false), 1500);
+            })
+          }
+          className="h-7 px-2.5 rounded-md border border-border text-[12px] text-foreground hover:bg-foreground/[0.04]"
+        >
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+      <div role="tablist" aria-label="Code format" className="flex gap-1 mb-2 overflow-x-auto no-scrollbar">
+        {PREVIEWABLE.map((key) => (
+          <button
+            key={key}
+            role="tab"
+            aria-selected={format === key}
+            onClick={() => setFormat(key)}
+            className={`h-7 px-2.5 shrink-0 rounded-md text-[12px] ${format === key ? "bg-pill text-foreground font-medium" : "text-muted hover:text-foreground"}`}
+          >
+            {FORMATS.find((f) => f.key === key)?.label}
+          </button>
+        ))}
+      </div>
+      <pre className="max-h-[260px] overflow-auto rounded-lg border border-border bg-canvas px-3 py-2.5 text-[11.5px] leading-relaxed font-mono text-foreground whitespace-pre">
+        {code}
+      </pre>
+    </section>
+  );
+}
 
 const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "schema";
 
@@ -194,6 +237,8 @@ export function ExportModal() {
                     </button>
                   </div>
                 </section>
+
+                <CodePreview files={files} />
 
                 <section>
                   <h3 className="ui-section-title mb-2">Diagram</h3>
