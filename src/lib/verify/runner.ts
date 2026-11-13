@@ -75,7 +75,11 @@ function fkFor(erd: ERD, table: Table, column: Column): Relationship | undefined
 
 /** Columns we supply on insert: skip auto-increment and defaulted columns. */
 function insertColumns(table: Table): Column[] {
-  return table.columns.filter((c) => !c.generated && !isAutoIncrement(c) && !(c.defaultValue && !c.isForeignKey));
+  // Defaulted columns are left to the database, unless a CHECK compares them
+  // (e.g. due_date > loan_date DEFAULT now()): then we supply values that agree.
+  const checked = (c: Column) =>
+    table.constraints.some((k) => k.type === "CHECK" && k.expression && new RegExp(`\\b${c.name}\\b`).test(k.expression));
+  return table.columns.filter((c) => !c.generated && !isAutoIncrement(c) && !(c.defaultValue && !c.isForeignKey && !checked(c)));
 }
 
 function missingReference(column: Column): string {
@@ -264,7 +268,8 @@ export async function runVerification(
         const key = set.join(",");
         if (seen.has(key) || !set.every((name) => columns.some((c) => c.name === name))) continue;
         seen.add(key);
-        const overrides = Object.fromEntries(set.map((name) => [name, `(SELECT ${name} FROM ${table.name} ORDER BY 1 LIMIT 1)`]));
+        // Copy every column of the set from the same existing row.
+        const overrides = Object.fromEntries(set.map((name) => [name, `(SELECT ${name} FROM ${table.name} ORDER BY ctid LIMIT 1)`]));
         await expectError(
           { table: table.name, kind: "unique", title: `${table.name}: rejects duplicate (${set.join(", ")})` },
           insert(overrides, 77),

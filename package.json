@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "benchmark": "BENCHMARK=1 vitest run src/__benchmark__"
   },
   "engines": {
     "node": ">=18.18.0"
