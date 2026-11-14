@@ -19,6 +19,7 @@
   "dependencies": {
     "@electric-sql/pglite": "^0.3.16",
     "@google/genai": "^1.40.0",
+    "@types/three": "^0.170.0",
     "@xyflow/react": "^12.10.0",
     "elkjs": "^0.9.3",
     "framer-motion": "^12.33.0",
@@ -28,6 +29,7 @@
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "three": "^0.170.0",
     "zod": "^4.3.6",
     "zundo": "^2.3.0",
     "zustand": "^5.0.11"
