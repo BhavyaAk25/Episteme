@@ -1,25 +1,28 @@
 import type { Metadata } from "next";
-import { JetBrains_Mono, IBM_Plex_Sans, Sora } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { ErrorReporter } from "@/components/shared/ErrorReporter";
 
-const jetbrainsMono = JetBrains_Mono({
+// Fonts ship with the app (variable woff2 from Fontsource, SIL OFL), so
+// builds never depend on downloading them from Google.
+const jetbrainsMono = localFont({
+  src: "./fonts/jetbrains-mono-latin-wght-normal.woff2",
   variable: "--font-jetbrains-mono",
-  subsets: ["latin"],
+  weight: "100 800",
   display: "swap",
 });
 
-const ibmPlexSans = IBM_Plex_Sans({
+const ibmPlexSans = localFont({
+  src: "./fonts/ibm-plex-sans-latin-wght-normal.woff2",
   variable: "--font-ibm-plex-sans",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: "100 700",
   display: "swap",
 });
 
-const sora = Sora({
+const sora = localFont({
+  src: "./fonts/sora-latin-wght-normal.woff2",
   variable: "--font-sora",
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: "100 800",
   display: "swap",
 });
 
@@ -43,7 +46,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    // Font variables live on <html> so the theme's --font-sans etc. (defined
+    // at :root) can resolve them.
+    <html lang="en" suppressHydrationWarning className={`${jetbrainsMono.variable} ${ibmPlexSans.variable} ${sora.variable}`}>
       <head>
         {/* Apply a saved light/dark choice before first paint (no flash). */}
         <script
@@ -52,9 +57,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body
-        className={`${jetbrainsMono.variable} ${ibmPlexSans.variable} ${sora.variable} antialiased`}
-      >
+      <body className="antialiased">
         {children}
         <ErrorReporter />
         {/* Free, cookie-free Vercel Web Analytics (served by Vercel; enable it in the project's Analytics tab). */}
