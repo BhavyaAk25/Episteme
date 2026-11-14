@@ -84,7 +84,7 @@ More detail: [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ## Run it locally
 
-Requirements: Node.js 18.18+ and npm.
+Requirements: Node.js 20+ and npm (production runs Node 24, the current LTS).
 
 ```bash
 git clone https://github.com/BhavyaAk25/Episteme.git
