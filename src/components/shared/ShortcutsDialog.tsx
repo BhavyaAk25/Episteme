@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { useDialogFocus } from "@/lib/hooks/useDialogFocus";
 import { useUIStore } from "@/store/useUIStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
 import { useErdStore } from "@/store/useErdStore";
@@ -33,6 +34,8 @@ const SHORTCUTS: Array<[string, string]> = [
 /** Global shortcuts that don't override browser defaults, plus a "?" help dialog. */
 export function ShortcutsDialog() {
   const { shortcutsOpen, setShortcutsOpen } = useUIStore();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(dialogRef, shortcutsOpen);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -69,7 +72,7 @@ export function ShortcutsDialog() {
   if (!shortcutsOpen) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" onClick={() => setShortcutsOpen(false)}>
-      <div role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" className="w-[420px] max-w-full rounded-xl border border-border bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" className="w-[420px] max-w-full rounded-xl border border-border bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
           <h2 className="text-[15px] font-semibold text-foreground">Keyboard shortcuts</h2>
           <button onClick={() => setShortcutsOpen(false)} aria-label="Close" className="w-8 h-8 rounded-lg text-muted hover:text-foreground hover:bg-foreground/5">×</button>

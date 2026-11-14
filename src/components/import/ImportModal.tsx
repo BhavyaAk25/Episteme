@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useDialogFocus } from "@/lib/hooks/useDialogFocus";
+import { useEscape } from "@/lib/hooks/useEscape";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUIStore } from "@/store/useUIStore";
 import { useProjectsStore } from "@/store/useProjectsStore";
@@ -26,6 +28,8 @@ const MAX_BYTES = 2_000_000;
 /** Paste or upload SQL DDL; it's run in Postgres in the browser and turned into a diagram. */
 export function ImportModal() {
   const { importOpen, setImportOpen, showNotice } = useUIStore();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(dialogRef, importOpen);
   const [sql, setSql] = useState("");
   const [name, setName] = useState("Imported schema");
   const [busy, setBusy] = useState(false);
@@ -35,7 +39,8 @@ export function ImportModal() {
   const close = () => {
     setImportOpen(false);
     setError(null);
-  };
+  };  useEscape(close, importOpen);
+
 
   const handleFile = async (file: File | undefined) => {
     if (!file) return;
@@ -84,6 +89,8 @@ export function ImportModal() {
             initial={{ scale: 0.97, y: 8 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.97, y: 8 }}
+            ref={dialogRef}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-label="Import SQL"

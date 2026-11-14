@@ -1,7 +1,8 @@
 "use client";
 
+import { useDialogFocus } from "@/lib/hooks/useDialogFocus";
 import { useEscape } from "@/lib/hooks/useEscape";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import { useUIStore, type ObjectEditorTarget } from "@/store/useUIStore";
 import { useErdStore } from "@/store/useErdStore";
 import { useSimulationStore, type QueryResult } from "@/store/useSimulationStore";
@@ -15,9 +16,13 @@ const areaClass =
 
 function Shell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   useEscape(onClose);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(dialogRef, true);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" onClick={onClose}>
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={title}

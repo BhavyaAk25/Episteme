@@ -7,7 +7,7 @@
   --bg-node: #fffdf8;
   --bg-node-header: #f6ebde;
   --text-primary: #32271b;
-  --text-secondary: #7b6a56;
+  --text-secondary: #6b5a47;
   --accent-blue: #2f6eb8;
   --accent-green: #237d54;
   --accent-amber: #b8811a;
@@ -377,3 +377,18 @@ nextjs-portal,
 *::-webkit-scrollbar { width: 8px; height: 8px; }
 *::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
 *::-webkit-scrollbar-track { background: transparent; }
+
+/* Keyboard focus is always visible (mouse clicks don't show it). */
+:where(button, a, summary, [role="tab"], [role="radio"], [role="separator"], [tabindex]):focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.react-flow__node:focus-visible { outline: none; }
+.react-flow__node:focus-visible .erd-node {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}

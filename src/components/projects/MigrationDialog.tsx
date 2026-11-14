@@ -1,7 +1,8 @@
 "use client";
 
+import { useDialogFocus } from "@/lib/hooks/useDialogFocus";
 import { useEscape } from "@/lib/hooks/useEscape";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import { useUIStore } from "@/store/useUIStore";
 import { useErdStore } from "@/store/useErdStore";
 import { useProjectsStore } from "@/store/useProjectsStore";
@@ -26,6 +27,8 @@ function MigrationDialogBody({ initialFrom }: { initialFrom: string }) {
   const [check, setCheck] = useState<{ state: "idle" | "running" } | { state: "done"; ok: boolean; message: string }>({ state: "idle" });
   const close = () => useUIStore.getState().setMigrationFrom(null);
   useEscape(close);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(dialogRef, true);
 
   const from = versions.find((v) => v.id === fromId)?.erd ?? null;
   const to = toId === CURRENT ? current : versions.find((v) => v.id === toId)?.erd ?? null;
@@ -62,6 +65,8 @@ function MigrationDialogBody({ initialFrom }: { initialFrom: string }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" onClick={close}>
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label="Migration SQL"
