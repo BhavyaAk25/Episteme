@@ -271,12 +271,7 @@ export function SchemaPreview3D({ erd, onPick, className = "" }: Props) {
         let visible = true;
         let previous = performance.now();
         const projected = new THREE.Vector3();
-        const draw = (now: number) => {
-          frame = requestAnimationFrame(draw);
-          const dt = Math.min(0.05, (now - previous) / 1000);
-          previous = now;
-          if (!visible || document.hidden) return;
-          if (!reducedMotion && !dragging && !hovered) group.rotation.y += dt * 0.12;
+        const paint = () => {
           renderer.render(scene, camera);
           const { width, height } = container.getBoundingClientRect();
           nodeMeshes.forEach((mesh, i) => {
@@ -295,6 +290,17 @@ export function SchemaPreview3D({ erd, onPick, className = "" }: Props) {
             label.style.transform = `translate(${x + 15}px, ${y - 8}px)`;
           });
         };
+        const draw = (now: number) => {
+          frame = requestAnimationFrame(draw);
+          const dt = Math.min(0.05, (now - previous) / 1000);
+          previous = now;
+          if (!visible || document.hidden) return;
+          if (!reducedMotion && !dragging && !hovered) group.rotation.y += dt * 0.12;
+          paint();
+        };
+        // One frame right away, so the preview is complete even before (or
+        // without) animation frames, e.g. in a background tab.
+        paint();
         frame = requestAnimationFrame(draw);
         const io = new IntersectionObserver(([entry]) => {
           visible = entry.isIntersecting;
