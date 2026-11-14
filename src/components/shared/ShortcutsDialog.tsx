@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useUIStore } from "@/store/useUIStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
+import { useErdStore } from "@/store/useErdStore";
 import { FEEDBACK_URL } from "@/lib/feedback";
 
 const isTyping = (target: EventTarget | null) =>
@@ -52,6 +53,9 @@ export function ShortcutsDialog() {
         if (add && !add.disabled) {
           event.preventDefault();
           add.click();
+        } else if (!useErdStore.getState().erd) {
+          event.preventDefault();
+          useErdStore.getState().startBlank();
         }
       } else if (event.key === "f" || event.key === "F") {
         event.preventDefault();

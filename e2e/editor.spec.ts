@@ -6,7 +6,7 @@ test.describe("start and edit", () => {
     await page.goto("/");
     await expect(page.getByText("1. Describe your system")).toBeVisible({ timeout: 10_000 });
     await page.getByRole("button", { name: "Skip tour" }).click();
-    for (const option of ["Describe it", "Start from a template", "Import SQL", "Blank canvas"]) {
+    for (const option of ["Describe it", "Open a template", "Import SQL", "Blank canvas"]) {
       await expect(page.getByText(option, { exact: true }).first()).toBeVisible();
     }
   });
@@ -141,5 +141,25 @@ test.describe("canvas interactions", () => {
     await page.locator(".react-flow__pane").click({ position: { x: 5, y: 5 } });
     await page.keyboard.press("n");
     await expect(page.locator(".react-flow__node")).toHaveCount(before + 1);
+  });
+});
+
+test.describe("start screen", () => {
+  test("3D preview renders a real template and opens it", async ({ page }) => {
+    await openApp(page);
+    const preview = page.getByRole("img", { name: /3D preview of \d+ tables/ });
+    await expect(preview).toBeVisible();
+    expect(await preview.locator("canvas").evaluate((c: HTMLCanvasElement) => c.clientHeight)).toBeGreaterThan(150);
+    await page.getByRole("tab", { name: "Inventory" }).click();
+    await expect(page.getByRole("img", { name: /3D preview/ }).locator("span", { hasText: "warehouses" })).toHaveCount(1);
+    await page.getByRole("button", { name: "Open Inventory →" }).click();
+    await expect(page.locator(".react-flow__node", { hasText: "warehouses" })).toBeVisible();
+  });
+
+  test("an example prompt fills the description", async ({ page }) => {
+    await openApp(page);
+    await page.getByRole("button", { name: "Library" }).click();
+    await expect(page.getByLabel("System description")).toHaveValue(/library where members borrow/i);
+    await expect(page.getByLabel("System description")).toBeFocused();
   });
 });

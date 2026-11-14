@@ -154,7 +154,9 @@ export function TopBar() {
                 {problemCount}
               </span>
             ) : (
-              <span className="sm:hidden">!</span>
+              <svg className="w-4 h-4 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 6h11M9 12h11M9 18h11M4.5 6l1 1 1.5-2M4.5 12l1 1 1.5-2M4.5 18l1 1 1.5-2" />
+              </svg>
             )}
           </button>
           <ThemeToggle />
