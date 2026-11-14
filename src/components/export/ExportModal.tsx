@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { useDialogFocus } from "@/lib/hooks/useDialogFocus";
+import { useEscape } from "@/lib/hooks/useEscape";
 import { motion, AnimatePresence } from "framer-motion";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useSimulationStore } from "@/store/useSimulationStore";
@@ -85,6 +87,8 @@ function download(content: Blob, fileName: string) {
 /** Download the schema in several formats, the diagram as an image, or a share link. */
 export function ExportModal() {
   const { exportModalOpen, closeExportModal } = useUIStore();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(dialogRef, exportModalOpen);
   const { ontology, prompt } = useProjectStore();
   const erd = useErdStore((state) => state.erd);
   const positions = useErdStore((state) => state.positions);
@@ -171,7 +175,8 @@ export function ExportModal() {
     setShareUrl(null);
     setError(null);
     closeExportModal();
-  };
+  };  useEscape(close, exportModalOpen);
+
 
   return (
     <AnimatePresence>
@@ -187,6 +192,8 @@ export function ExportModal() {
             initial={{ scale: 0.97, y: 8 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.97, y: 8 }}
+            ref={dialogRef}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-label="Export"

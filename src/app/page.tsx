@@ -38,7 +38,7 @@ function readLegacyErd(): ERD | null {
     return null;
   }
 }
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 
 export default function Home() {
   const { error, errorTitle, setError } = useProjectStore();
@@ -162,6 +162,8 @@ export default function Home() {
   }, [setError]);
 
   return (
+    // Panel and dialog animations follow the system's reduced-motion setting.
+    <MotionConfig reducedMotion="user">
     <div className="h-screen flex flex-col bg-canvas overflow-hidden">
       {/* Top Bar */}
       <TopBar />
@@ -262,5 +264,6 @@ export default function Home() {
         )}
       </AnimatePresence>
     </div>
+    </MotionConfig>
   );
 }

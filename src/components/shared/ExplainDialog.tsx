@@ -1,7 +1,8 @@
 "use client";
 
+import { useDialogFocus } from "@/lib/hooks/useDialogFocus";
 import { useEscape } from "@/lib/hooks/useEscape";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import { useUIStore } from "@/store/useUIStore";
 import { useErdStore } from "@/store/useErdStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
@@ -24,6 +25,8 @@ function ExplainBody() {
   const [error, setError] = useState<string | null>(null);
   const close = () => useUIStore.getState().setExplainOpen(false);
   useEscape(close);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(dialogRef, true);
   const answer = ai ?? offline;
   const tableIds = new Map(erd?.tables.map((t) => [t.name, t.id]) ?? []);
 
@@ -47,6 +50,8 @@ function ExplainBody() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" onClick={close}>
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label="Explain this schema"
