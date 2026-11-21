@@ -4,6 +4,7 @@ import { useProjectStore } from "@/store/useProjectStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
 import { useErdStore } from "@/store/useErdStore";
 import { TABLE_COLORS } from "@/lib/erd/colors";
+import { SidebarIcon } from "@/components/shared/SidebarIcon";
 import { FEEDBACK_URL } from "@/lib/feedback";
 import { useUIStore } from "@/store/useUIStore";
 import { SidebarLoadingSkeleton } from "@/components/shared/LoadingStates";
@@ -64,33 +65,6 @@ export function OntologySidebar() {
 
   return (
     <>
-      {/* Toggle button — positioned at right edge of sidebar, vertically centered */}
-      <button
-        onClick={toggleSidebar}
-        className="absolute top-1/2 -translate-y-1/2 z-20 bg-elevated border border-border rounded-r-lg p-2 hover:bg-pill transition-all shadow-md"
-        style={{
-          left: sidebarOpen ? sidebarWidth : 0,
-          transition: "left 300ms ease-in-out",
-        }}
-        title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
-      >
-        <svg
-          className={`w-4 h-4 text-muted transition-transform ${
-            sidebarOpen ? "" : "rotate-180"
-          }`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M15 19l-7-7 7-7"
-          />
-        </svg>
-      </button>
-
       {/* Sidebar panel */}
       <AnimatePresence>
         {sidebarOpen && (
@@ -104,7 +78,17 @@ export function OntologySidebar() {
           >
             {/* Header */}
             <div className="px-5 pt-5 pb-4 border-b border-border/60">
-              <h2 className="text-[17px] leading-tight font-semibold text-foreground">Schema</h2>
+              <div className="flex items-start justify-between gap-2">
+                <h2 className="text-[17px] leading-tight font-semibold text-foreground">Schema</h2>
+                <button
+                  onClick={toggleSidebar}
+                  aria-label="Hide sidebar"
+                  title="Hide sidebar ( [ )"
+                  className="-mt-1 -mr-1.5 w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-foreground hover:bg-foreground/[0.06] transition-colors"
+                >
+                  <SidebarIcon />
+                </button>
+              </div>
               <p className="mt-1 text-[12px] text-muted">
                 {erd
                   ? `${erd.tables.length} table${erd.tables.length === 1 ? "" : "s"} · ${erd.relationships.length} relationship${erd.relationships.length === 1 ? "" : "s"}`

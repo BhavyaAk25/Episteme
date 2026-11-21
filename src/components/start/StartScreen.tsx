@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import dynamic from "next/dynamic";
 import type { ERD } from "@/types/erd";
 import { useUIStore } from "@/store/useUIStore";
 import { useErdStore } from "@/store/useErdStore";
 import { useProjectStore } from "@/store/useProjectStore";
 import { TEMPLATES, loadTemplate, type TemplateId } from "@/lib/actions/templates";
 
-const SchemaPreview3D = dynamic(() => import("./SchemaPreview3D").then((m) => m.SchemaPreview3D), { ssr: false });
+import { SchemaPreview } from "./SchemaPreview";
 
 const EXAMPLES = [
   { label: "Vet clinic", prompt: "A veterinary clinic chain: owners have pets, vets work at several clinics, appointments become visits with diagnoses, prescriptions and invoices paid in parts." },
@@ -91,8 +90,8 @@ export function StartScreen() {
       </div>
 
       <figure className="min-w-0 @max-[739px]:hidden">
-        <div className="relative aspect-square max-h-[460px] w-full rounded-2xl border border-border bg-surface/40 overflow-hidden">
-          {erd && <SchemaPreview3D key={previewId} erd={erd} onPick={() => void loadTemplate(previewId)} className="absolute inset-0" />}
+        <div className="relative aspect-[4/3.4] max-h-[440px] w-full rounded-2xl border border-border dotted-grid-bg overflow-hidden">
+          {erd && <SchemaPreview key={previewId} erd={erd} onPick={() => void loadTemplate(previewId)} className="absolute inset-0" />}
         </div>
         <figcaption className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
           <div role="tablist" aria-label="Example schema" className="flex gap-1">
@@ -113,7 +112,7 @@ export function StartScreen() {
           </button>
         </figcaption>
         <p className="mt-1 text-[11px] text-muted">
-          {erd ? `${erd.tables.length} tables, ${erd.relationships.length} links.` : ""} Drag to turn, hover a table to see what it links to.
+          {erd ? `${erd.tables.length} tables, ${erd.relationships.length} links.` : ""} Hover a table to see what it links to; click to open it.
         </p>
       </figure>
     </div>

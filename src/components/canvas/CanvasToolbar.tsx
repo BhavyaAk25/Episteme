@@ -6,6 +6,7 @@ import { useStore } from "zustand";
 import { useErdStore, undoErd, redoErd } from "@/store/useErdStore";
 import { useCanvasStore } from "@/store/useCanvasStore";
 import { useUIStore, type NodeDetail } from "@/store/useUIStore";
+import { SidebarIcon } from "@/components/shared/SidebarIcon";
 import { useProjectStore } from "@/store/useProjectStore";
 import { layoutErd } from "@/lib/erd/layout";
 import { HistoryPanel } from "@/components/projects/HistoryPanel";
@@ -106,6 +107,7 @@ export function CanvasToolbar({ disabled }: { disabled: boolean }) {
   const canRedo = useStore(useErdStore.temporal, (state) => state.futureStates.length > 0);
   const hasTables = useErdStore((state) => (state.erd?.tables.length ?? 0) > 0);
   const [tidying, setTidying] = useState(false);
+  const sidebarOpen = useUIStore((state) => state.sidebarOpen);
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const handleAddTable = useCallback(() => {
@@ -146,6 +148,14 @@ export function CanvasToolbar({ disabled }: { disabled: boolean }) {
         data-tour="toolbar"
         className="flex flex-wrap @max-[700px]:flex-nowrap @max-[700px]:overflow-x-auto no-scrollbar items-center gap-0.5 rounded-lg border border-border bg-surface/95 backdrop-blur px-1 py-1 shadow-sm max-w-[calc(100cqw-24px)]"
       >
+        {!sidebarOpen && (
+          <>
+            <ToolButton onClick={() => useUIStore.getState().toggleSidebar()} title="Show sidebar ( [ )">
+              <SidebarIcon />
+            </ToolButton>
+            <span className="w-px h-5 bg-border mx-1 shrink-0" />
+          </>
+        )}
         <ToolButton onClick={handleAddTable} disabled={disabled} title="Add table">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeWidth={2} d="M12 5v14M5 12h14" />

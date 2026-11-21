@@ -100,6 +100,17 @@ function TestRow({ test }: { test: DbTest }) {
   );
 }
 
+/** "2 errors" as a soft coloured chip when there are any, plain text otherwise. */
+function CountChip({ count, label, tone }: { count: number; label: string; tone: "error" | "warning" }) {
+  const text = `${count} ${label}${count === 1 ? "" : "s"}`;
+  if (!count) return <span className="text-muted">{text}</span>;
+  return (
+    <span className={`h-5 px-2 rounded-full inline-flex items-center font-semibold ${tone === "error" ? "bg-error/12 text-error" : "bg-warning/12 text-warning"}`}>
+      {text}
+    </span>
+  );
+}
+
 function ReviewButton() {
   const status = useReviewStore((s) => s.status);
   return (
@@ -198,31 +209,49 @@ export function VerifyPanel() {
           <span className="block mx-auto mt-1 h-1 w-10 rounded-full bg-border opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
       )}
-      <div className="h-10 bg-surface/95 border-t border-border px-4 flex items-center gap-4">
+      <div className="h-10 bg-surface border-t border-border px-2 flex items-center">
         <button
           onClick={toggleDrawer}
-          className="flex items-center gap-3 h-full flex-1 min-w-0 text-left"
+          className="group flex items-center gap-2.5 h-full flex-1 min-w-0 text-left px-2 rounded-md"
           aria-expanded={drawerOpen}
           aria-label={drawerOpen ? "Hide checks" : "Show checks"}
         >
+          <span
+            className={`w-2 h-2 rounded-full shrink-0 ${counts.error || failed ? "bg-error" : counts.warning ? "bg-warning" : "bg-success"}`}
+            aria-hidden="true"
+          />
           <span className="text-[13px] font-semibold text-foreground">Checks</span>
-          <span className="flex items-center gap-3 text-[12px]">
-            <span className={counts.error ? "text-error font-semibold" : "text-muted"}>{counts.error} error{counts.error === 1 ? "" : "s"}</span>
-            <span className={counts.warning ? "text-warning font-semibold" : "text-muted"}>{counts.warning} warning{counts.warning === 1 ? "" : "s"}</span>
-            <span className="text-muted">{counts.info} suggestion{counts.info === 1 ? "" : "s"}</span>
+          <span className="flex items-center gap-1.5 text-[12px] min-w-0">
+            <CountChip count={counts.error} label="error" tone="error" />
+            <CountChip count={counts.warning} label="warning" tone="warning" />
+            <span className="hidden md:inline text-muted">
+              {counts.info} suggestion{counts.info === 1 ? "" : "s"}
+            </span>
           </span>
-          <span className="hidden sm:inline text-[12px] text-muted truncate">
-            {isRunning
-              ? progress
-              : run
-                ? `· Postgres: ${passed} passed${failed ? `, ${failed} failed` : ""}${skipped ? `, ${skipped} skipped` : ""} in ${(run.durationMs / 1000).toFixed(1)}s`
-                : "· Postgres tests not run yet"}
+          <span className="hidden sm:inline-flex items-center gap-1.5 ml-1 pl-3 border-l border-border text-[12px] text-muted min-w-0">
+            {isRunning ? (
+              <span className="w-3 h-3 shrink-0 border-[1.5px] border-muted/40 border-t-muted rounded-full animate-spin" aria-hidden="true" />
+            ) : (
+              <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 3h6M10 3v6l-5 9a2 2 0 001.8 3h10.4a2 2 0 001.8-3l-5-9V3" />
+              </svg>
+            )}
+            <span className="truncate">
+              {isRunning
+                ? progress
+                : run
+                  ? `Postgres: ${passed} passed${failed ? `, ${failed} failed` : ""}${skipped ? `, ${skipped} skipped` : ""} · ${(run.durationMs / 1000).toFixed(1)}s`
+                  : "Postgres tests not run yet"}
+            </span>
           </span>
-          {/* Inside the button, so the arrow toggles the panel too. */}
-          <span className="ml-auto shrink-0 w-8 h-8 -mr-2 rounded-md flex items-center justify-center text-muted hover:text-foreground hover:bg-foreground/[0.05]">
-            <svg className={`w-4 h-4 transition-transform ${drawerOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-            </svg>
+          {/* Inside the button, so the whole bar (and the arrow) toggles the panel. */}
+          <span className="ml-auto shrink-0 inline-flex items-center gap-2 text-[12px] text-muted group-hover:text-foreground transition-colors">
+            <span className="hidden md:inline">{drawerOpen ? "Hide" : "Details"}</span>
+            <span className="w-6 h-6 rounded-full border border-border flex items-center justify-center group-hover:border-foreground/30 transition-colors">
+              <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${drawerOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 15l6-6 6 6" />
+              </svg>
+            </span>
           </span>
         </button>
       </div>
