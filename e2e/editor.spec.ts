@@ -145,13 +145,12 @@ test.describe("canvas interactions", () => {
 });
 
 test.describe("start screen", () => {
-  test("3D preview renders a real template and opens it", async ({ page }) => {
+  test("the preview shows a real template and opens it", async ({ page }) => {
     await openApp(page);
-    const preview = page.getByRole("img", { name: /3D preview of \d+ tables/ });
-    await expect(preview).toBeVisible();
-    expect(await preview.locator("canvas").evaluate((c: HTMLCanvasElement) => c.clientHeight)).toBeGreaterThan(150);
+    const figure = page.locator("figure");
+    await expect(figure.getByRole("button", { name: /Open this template: \d+ tables/ })).toBeVisible();
     await page.getByRole("tab", { name: "Inventory" }).click();
-    await expect(page.getByRole("img", { name: /3D preview/ }).locator("span", { hasText: "warehouses" })).toHaveCount(1);
+    await expect(figure.getByText("warehouses", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Open Inventory →" }).click();
     await expect(page.locator(".react-flow__node", { hasText: "warehouses" })).toBeVisible();
   });

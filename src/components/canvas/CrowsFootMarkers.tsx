@@ -1,6 +1,6 @@
 /**
  * SVG marker definitions for crow's-foot notation. Each marker is drawn with
- * its tip (x = 24) at the table edge, so the same shape works at both ends
+ * its tip (x = 20) at the table edge, so the same shape works at both ends
  * of an edge (`orient="auto-start-reverse"`).
  *
  *   one-mandatory  ||     one-optional  o|
@@ -19,33 +19,35 @@ export function markerId(kind: EndKind, tone: keyof typeof MARKER_COLORS): strin
 
 function Shape({ kind, color }: { kind: EndKind; color: string }) {
   // Colors come from CSS variables, so they're set via style (not attributes).
-  const stroke = { style: { stroke: color, fill: "none" }, strokeWidth: 1.5 } as const;
-  const circle = (cx: number) => (
-    <circle cx={cx} cy={10} r={3.5} strokeWidth={1.5} style={{ stroke: color, fill: "var(--bg-canvas)" }} />
+  // Drawn on a 20x16 grid with the tip at x = 20 (the table edge).
+  const line = { style: { stroke: color, fill: "none" }, strokeWidth: 1.4, strokeLinecap: "round", strokeLinejoin: "round" } as const;
+  const ring = (cx: number) => (
+    <circle cx={cx} cy={8} r={2.75} strokeWidth={1.4} style={{ stroke: color, fill: "var(--bg-canvas)" }} />
   );
-  const crow = <path d="M13 10 L24 3 M13 10 L24 17 M13 10 L24 10" {...stroke} />;
+  // The crow's foot: three prongs meeting 8px from the table.
+  const crow = <path d="M12 8 L20 2.5 M12 8 L20 13.5 M12 8 L20 8" {...line} />;
 
   switch (kind) {
     case "one-mandatory":
-      return <path d="M13 4 V16 M18 4 V16" {...stroke} />;
+      return <path d="M12.5 3.5 V12.5 M16 3.5 V12.5" {...line} />;
     case "one-optional":
       return (
         <>
-          {circle(8)}
-          <path d="M17 4 V16" {...stroke} />
+          {ring(8)}
+          <path d="M15.5 3.5 V12.5" {...line} />
         </>
       );
     case "many-mandatory":
       return (
         <>
-          <path d="M9 4 V16" {...stroke} />
+          <path d="M9 3.5 V12.5" {...line} />
           {crow}
         </>
       );
     case "many-optional":
       return (
         <>
-          {circle(6)}
+          {ring(7)}
           {crow}
         </>
       );
@@ -63,11 +65,11 @@ export function CrowsFootMarkers() {
             <marker
               key={markerId(kind, tone)}
               id={markerId(kind, tone)}
-              viewBox="0 0 24 20"
-              refX={24}
-              refY={10}
-              markerWidth={24}
-              markerHeight={20}
+              viewBox="0 0 20 16"
+              refX={20}
+              refY={8}
+              markerWidth={20}
+              markerHeight={16}
               markerUnits="userSpaceOnUse"
               orient="auto-start-reverse"
             >

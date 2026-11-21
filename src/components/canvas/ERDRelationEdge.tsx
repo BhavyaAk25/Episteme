@@ -1,7 +1,7 @@
 "use client";
 
 import { memo } from "react";
-import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, useStore, type EdgeProps } from "@xyflow/react";
+import { BaseEdge, EdgeLabelRenderer, getBezierPath, useStore, type EdgeProps } from "@xyflow/react";
 import type { ERDEdgeData } from "@/types/erd";
 import { useCanvasStore } from "@/store/useCanvasStore";
 import { MARKER_COLORS, markerId, type EndKind } from "./CrowsFootMarkers";
@@ -90,15 +90,16 @@ function ERDRelationEdgeComponent({
   const hot = isSelected || hovered;
   const tone = hot ? "selected" : "default";
 
-  const [edgePath, labelX, labelY] = getSmoothStepPath({
+  // A smooth curve per relationship: lines never merge into shared trunks,
+  // and both ends still leave the tables horizontally for the crow's feet.
+  const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
     sourcePosition,
     targetX,
     targetY,
     targetPosition,
-    borderRadius: 10,
-    offset: 28,
+    curvature: 0.32,
   });
 
   const kinds = endKinds(edgeData);
@@ -113,8 +114,9 @@ function ERDRelationEdgeComponent({
         interactionWidth={16}
         style={{
           stroke: MARKER_COLORS[tone],
-          strokeWidth: hot ? 2 : 1.5,
-          strokeDasharray: edgeData?.required ? undefined : "6 4",
+          strokeWidth: hot ? 2 : 1.4,
+          strokeLinecap: "round",
+          strokeDasharray: edgeData?.required ? undefined : "5 4",
         }}
       />
       {hot && edgeData && <EdgeLabel data={edgeData} x={labelX} y={labelY} />}

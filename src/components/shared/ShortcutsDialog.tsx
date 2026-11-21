@@ -27,6 +27,7 @@ const SHORTCUTS: Array<[string, string]> = [
   ["Double-click a name", "Rename a table or column"],
   ["N", "New table"],
   ["F", "Fit the diagram to the screen"],
+  ["[", "Show or hide the sidebar"],
   ["Esc", "Close dialogs and menus"],
   ["?", "Show this list"],
 ];
@@ -60,6 +61,9 @@ export function ShortcutsDialog() {
           event.preventDefault();
           useErdStore.getState().startBlank();
         }
+      } else if (event.key === "[") {
+        event.preventDefault();
+        useUIStore.getState().toggleSidebar();
       } else if (event.key === "f" || event.key === "F") {
         event.preventDefault();
         useCanvasStore.getState().requestFit();
